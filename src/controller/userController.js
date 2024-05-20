@@ -71,6 +71,7 @@ const getUserAllDetails = async (req, res) => {
     const responseData = {
       id: user.id,
       name: user.display_name,
+      role: user.role_id,
       user_status: user.user_status,
       is_active: user.is_active,
       leaves,
@@ -195,10 +196,8 @@ const getAttendanceCalender = async (req, res) => {
     const { month, year } = req.params;
 
     if (!month || !year) {
-      return res.status(400).send('Month and Year are required');
+      return res.status(400).send("Month and Year are required");
     }
-
-   
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }
