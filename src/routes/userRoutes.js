@@ -9,6 +9,7 @@ import {
   getAllLeaves,
   getLeaveDetail,
   requestLeave,
+  getAttendanceCalender,
 } from "../controller/userController.js";
 import { verifyToken } from "../middlewares/authMiddleware.js";
 
@@ -22,7 +23,7 @@ userRouter.get("/getUserProfileDetails", [verifyToken], getUserProfileDetails);
 //attendance related apis
 
 userRouter.post("/markAttendance", [verifyToken], markAttendance);
-// userRouter.get("/getAttendanceCalender", [verifyToken], getAttendanceCalender);
+userRouter.get("/getAttendanceCalender", [verifyToken], getAttendanceCalender);
 
 //task related apis
 

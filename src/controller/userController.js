@@ -62,20 +62,42 @@ const getUserAllDetails = async (req, res) => {
       },
     ];
 
-    let [tasks] = await db.query(
-      `SELECT * FROM tasks WHERE assigned_to = ? AND status = ?`,
-      [user.id, 0]
-    );
+    const tasksQuery = `
+    SELECT 
+      t.*, 
+      CONCAT(assigneeUser.first_name, ' ', assigneeUser.last_name) AS assignee_name, 
+      CONCAT(assignedToUser.first_name, ' ', assignedToUser.last_name) AS assigned_user_name 
+    FROM tasks t
+    LEFT JOIN users assigneeUser ON t.assignee = assigneeUser.id
+    LEFT JOIN users assignedToUser ON t.assigned_to = assignedToUser.id
+    WHERE t.assigned_to = ? AND t.status = ?
+    LIMIT 10
+  `;
 
-    tasks = tasks.slice(0, 10);
+    let [tasks] = await db.query(tasksQuery, [user.id, 0]);
+
+    // Query to count all pending tasks
+    const pendingTasksCountQuery = `
+        SELECT COUNT(*) AS pending_tasks_count 
+        FROM tasks 
+        WHERE assigned_to = ? AND status = ?
+      `;
+
+    let [pending_tasks_count] = await db.query(pendingTasksCountQuery, [
+      user.id,
+      0,
+    ]);
+    pending_tasks_count = pending_tasks_count[0].pending_tasks_count;
+
     const responseData = {
       id: user.id,
-      name: user.display_name,
+      name: user.first_name + " " + user.last_name,
       role: user.role_id,
       user_status: user.user_status,
       is_active: user.is_active,
       leaves,
       tasks,
+      pending_tasks_count,
     };
 
     return sendResponseData(
@@ -193,11 +215,82 @@ const markAttendance = async (req, res) => {
 const getAttendanceCalender = async (req, res) => {
   try {
     const user = req.user;
-    const { month, year } = req.params;
+    const { month, year } = req.query;
+    console.log(month, year);
 
     if (!month || !year) {
-      return res.status(400).send("Month and Year are required");
+      return sendErrorResponse(404, "Month and Year are required", res);
     }
+
+    const query = `
+    SELECT *  FROM attendance 
+    WHERE user_id = ? AND MONTH(date_time) = ? AND YEAR(date_time) = ?
+  `;
+
+    const [attendances] = await db.query(query, [user.id, month, year]);
+
+    const leavesQuery = `
+    SELECT *  FROM leaves 
+    WHERE user_id = ? AND MONTH(leave_start) = ? AND YEAR(leave_end) = ?
+  `;
+
+    const [leaves] = await db.query(leavesQuery, [user.id, month, year]);
+
+    console.log(leaves);
+
+    const [user_access] = await db.query(
+      `SELECT can_view_public_holidays FROM user_access WHERE user_id = ?`,
+      [user.id]
+    );
+
+    if (!user_access.length) {
+      return sendErrorResponse(400, "User can't access leaves settings", res);
+    }
+
+    const { can_view_public_holidays } = user_access[0];
+
+    if (!can_view_public_holidays) {
+      return sendErrorResponse(400, "Can't view leaves", res);
+    }
+    const publicHolidaysQuery = `SELECT holiday_date FROM admin_public_holidays_settings `;
+
+    const [public_holidays] = await db.query(publicHolidaysQuery, [
+      month,
+      year,
+    ]);
+    console.log(public_holidays);
+    // Prepare a set of public holiday dates for quick lookup
+    const publicHolidayDates = new Set(
+      public_holidays.map(
+        (holiday) => holiday.holiday_date.toISOString().split("T")[0]
+      )
+    );
+    console.log(publicHolidayDates);
+
+    // Transform the response to the desired format
+    const formattedAttendances = attendances.map((att) => {
+      const attendanceDate = att.date_time.toISOString().split("T")[0];
+      const isLeave = leaves.some((leave) => {
+        const leaveStart = leave.leave_start.toISOString().split("T")[0];
+        const leaveEnd = leave.leave_end.toISOString().split("T")[0];
+        return (
+          attendanceDate >= leaveStart &&
+          attendanceDate <= leaveEnd &&
+          leaveStart.leave_status
+        );
+      });
+      const isPublicHoliday = publicHolidayDates.has(attendanceDate);
+
+      return {
+        date: attendanceDate,
+        checkInTime: att.date_time.toISOString().split("T")[1].split(".")[0], // Extract time part
+        checkInLocation: att.location,
+        isLeave,
+        isPublicHoliday,
+      };
+    });
+    console.log(formattedAttendances);
+    return sendResponseData(200, "attendance", formattedAttendances, res);
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }
