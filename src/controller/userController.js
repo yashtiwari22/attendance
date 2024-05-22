@@ -1,4 +1,5 @@
 import db from "../config/connectDb.js";
+import { IsActive, UserStatus } from "../config/constants.js";
 import {
   sendResponseData,
   sendErrorResponse,
@@ -24,43 +25,40 @@ const getUserAllDetails = async (req, res) => {
     annual_leaves = annual_leaves[0].annual_leaves;
     casual_leaves = casual_leaves[0].casual_leaves;
 
-    const [user_access] = await db.query(
-      `SELECT can_view_leaves FROM user_access WHERE user_id = ?`,
-      [user.id]
-    );
+    // const [user_access] = await db.query(
+    //   `SELECT can_view_leaves FROM user_access WHERE user_id = ?`,
+    //   [user.id]
+    // );
 
-    if (!user_access.length) {
-      return sendErrorResponse(400, "User can't access leaves settings", res);
-    }
+    // if (!user_access.length) {
+    //   return sendErrorResponse(400, "User can't access leaves settings", res);
+    // }
 
-    const { can_view_leaves } = user_access[0];
+    // const { can_view_leaves } = user_access[0];
 
     const settings = {};
-    if (can_view_leaves) {
-      const [leaves_settings] = await db.query(
-        `SELECT * FROM admin_leaves_settings`
-      );
-      settings.leaves_settings = leaves_settings;
-    } else {
-      return sendErrorResponse(400, "Can't view leaves", res);
-    }
 
-    console.log(settings);
+    const [leaves_settings] = await db.query(
+      `SELECT * FROM admin_leaves_settings`
+    );
+    settings.leaves_settings = leaves_settings;
 
     const leaves = [
       {
         id: 1,
         name: "casual leaves",
         consumed: casual_leaves,
-        available: settings.leaves_settings[0].leaves_value,
+        available: settings.leaves_settings[0].leave_value,
       },
       {
         id: 2,
         name: "annual leaves",
         consumed: annual_leaves,
-        available: settings.leaves_settings[1].leaves_value,
+        available: settings.leaves_settings[1].leave_value,
       },
     ];
+
+    console.log(leaves);
 
     const tasksQuery = `
     SELECT 
@@ -112,59 +110,6 @@ const getUserAllDetails = async (req, res) => {
   }
 };
 
-// const getSettings = async (req, res) => {
-//   try {
-//     const { user_id } = req.body;
-//     const [user_access] = await db.query(
-//       `SELECT can_view_leaves,can_view_public_holidays,can_view_policies FROM user_access WHERE user_id = ?`,
-//       [user_id]
-//     );
-
-//     if (!user_access.length) {
-//       return sendErrorResponse(400, "User access not found", res);
-//     }
-
-//     const { can_view_leaves, can_view_public_holidays, can_view_policies } =
-//       user_access[0];
-
-//     const settings = {};
-//     if (can_view_leaves) {
-//       const [leaves_settings] = await db.query(
-//         `SELECT * FROM admin_leaves_settings`
-//       );
-//       settings.leaves_settings = leaves_settings[0];
-//     } else {
-//       return sendErrorResponse(400, "Can't view leaves", res);
-//     }
-//     if (can_view_public_holidays) {
-//       const [public_holidays_settings] = await db.query(
-//         `SELECT * FROM admin_public_holidays_settings`
-//       );
-//       settings.public_holidays_settings = public_holidays_settings[0];
-//     } else {
-//       return sendErrorResponse(400, "Can't view public holidays", res);
-//     }
-
-//     if (can_view_policies) {
-//       const [policies_settings] = await db.query(
-//         `SELECT * FROM admin_policies_settings`
-//       );
-//       settings.policies_settings = policies_settings[0];
-//     } else {
-//       return sendErrorResponse(400, "Can't view policies", res);
-//     }
-
-//     return sendResponseData(
-//       200,
-//       "Settings retrieved successfully",
-//       settings,
-//       res
-//     );
-//   } catch (error) {
-//     return sendErrorResponse(500, error.message, res);
-//   }
-// };
-
 const getUserProfileDetails = async (req, res) => {
   try {
     const user = req.user;
@@ -172,6 +117,20 @@ const getUserProfileDetails = async (req, res) => {
     if (!user || Object.keys(user).length === 0) {
       return sendErrorResponse(400, "No user found in request", res);
     }
+
+    const query = `SELECT * FROM department_manager`;
+
+    const [departments] = await db.query(query);
+    console.log(departments);
+
+    let department_name = null;
+
+    departments.map((department) => {
+      if (department.department_id === user.department_id) {
+        department_name = department.department_name;
+        return;
+      }
+    });
 
     const responseData = {
       id: user.id,
@@ -181,9 +140,9 @@ const getUserProfileDetails = async (req, res) => {
       phone: user.phone,
       image_url: user.image_url,
       designation: user.designation,
-      department_id: user.department_id,
-      user_status: user.user_status,
-      is_active: user.is_active,
+      department: department_name,
+      user_status: UserStatus.getLabel(user.user_status),
+      is_active: IsActive.getLabel(user.is_active),
     };
 
     return sendResponseData(
@@ -197,16 +156,98 @@ const getUserProfileDetails = async (req, res) => {
   }
 };
 
+const updateUserProfileDetails = async (req, res) => {
+  try {
+    const user = req.user;
+
+    console.log(user.id);
+
+    const { display_name, image_url } = req.body;
+
+    if (!user || Object.keys(user).length === 0) {
+      return sendErrorResponse(400, "No user found in request", res);
+    }
+
+    const updateQuery = `UPDATE users SET display_name = ? ,image_url = ? WHERE id =?`;
+
+    const [updatedUser] = await db.query(updateQuery, [
+      display_name,
+      image_url,
+      user.id,
+    ]);
+
+    if (updatedUser.affectedRows === 0) {
+      return sendErrorResponse(400, "User profile not updated", res);
+    }
+    console.log(updatedUser);
+    return sendResponse(200, "User profile updated successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
 const markAttendance = async (req, res) => {
   try {
-    const { user_id, date_time, location } = req.body;
+    const user = req.user;
+
+    if (!user || Object.keys(user).length === 0) {
+      return sendErrorResponse(400, "No user found in request", res);
+    }
+    const { date_time, location } = req.body;
+
+    // Extract the date part from date_time to check for existing attendance
+    const date = new Date(date_time).toISOString().split("T")[0];
+
+    // Check if the user has already marked attendance for the given day
+    const [existingAttendance] = await db.query(
+      `SELECT * FROM attendance WHERE user_id = ? AND DATE(date_time) = ?`,
+      [user.id, date]
+    );
+
+    if (existingAttendance.length > 0) {
+      return sendErrorResponse(400, "Attendance already marked for today", res);
+    }
     //Mark the attendance for user
     const [attendance] = await db.query(
       `INSERT INTO attendance (user_id,date_time,location) VALUES (?, ?, ?)`,
-      [user_id, date_time, location]
+      [user.id, date_time, location]
     );
 
     return sendResponse(200, "Attendance marked successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+
+const checkAttendance = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (!user || Object.keys(user).length === 0) {
+      return sendErrorResponse(400, "No user found in request", res);
+    }
+
+    // Extract the date part from date_time to check for existing attendance
+    const date = new Date(Date.now()).toISOString().split("T")[0];
+
+    // Check if the user has already marked attendance for the given day
+    const [existingAttendance] = await db.query(
+      `SELECT * FROM attendance WHERE user_id = ? AND DATE(date_time) = ?`,
+      [user.id, date]
+    );
+    let responseData;
+
+    if (existingAttendance.length > 0) {
+      responseData = {
+        is_marked: true,
+        ...existingAttendance[0],
+      };
+    } else {
+      responseData = {
+        isMarked: false,
+      };
+    }
+
+    return sendResponseData(200, "Attendance", responseData, res);
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }
@@ -216,7 +257,7 @@ const getAttendanceCalender = async (req, res) => {
   try {
     const user = req.user;
     const { month, year } = req.query;
-    console.log(month, year);
+    // console.log(month, year);
 
     if (!month || !year) {
       return sendErrorResponse(404, "Month and Year are required", res);
@@ -229,6 +270,8 @@ const getAttendanceCalender = async (req, res) => {
 
     const [attendances] = await db.query(query, [user.id, month, year]);
 
+    // console.log(attendances);
+
     const leavesQuery = `
     SELECT *  FROM leaves 
     WHERE user_id = ? AND MONTH(leave_start) = ? AND YEAR(leave_end) = ?
@@ -236,29 +279,14 @@ const getAttendanceCalender = async (req, res) => {
 
     const [leaves] = await db.query(leavesQuery, [user.id, month, year]);
 
-    console.log(leaves);
-
-    const [user_access] = await db.query(
-      `SELECT can_view_public_holidays FROM user_access WHERE user_id = ?`,
-      [user.id]
-    );
-
-    if (!user_access.length) {
-      return sendErrorResponse(400, "User can't access leaves settings", res);
-    }
-
-    const { can_view_public_holidays } = user_access[0];
-
-    if (!can_view_public_holidays) {
-      return sendErrorResponse(400, "Can't view leaves", res);
-    }
+    // console.log(leaves);
     const publicHolidaysQuery = `SELECT holiday_date FROM admin_public_holidays_settings `;
 
     const [public_holidays] = await db.query(publicHolidaysQuery, [
       month,
       year,
     ]);
-    console.log(public_holidays);
+    // console.log(public_holidays);
     // Prepare a set of public holiday dates for quick lookup
     const publicHolidayDates = new Set(
       public_holidays.map(
@@ -270,6 +298,8 @@ const getAttendanceCalender = async (req, res) => {
     // Transform the response to the desired format
     const formattedAttendances = attendances.map((att) => {
       const attendanceDate = att.date_time.toISOString().split("T")[0];
+
+      console.log(attendanceDate);
       const isLeave = leaves.some((leave) => {
         const leaveStart = leave.leave_start.toISOString().split("T")[0];
         const leaveEnd = leave.leave_end.toISOString().split("T")[0];
@@ -289,7 +319,7 @@ const getAttendanceCalender = async (req, res) => {
         isPublicHoliday,
       };
     });
-    console.log(formattedAttendances);
+    // console.log(formattedAttendances);
     return sendResponseData(200, "attendance", formattedAttendances, res);
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
@@ -485,7 +515,9 @@ const requestLeave = async (req, res) => {
 export {
   getUserAllDetails,
   getUserProfileDetails,
+  updateUserProfileDetails,
   markAttendance,
+  checkAttendance,
   getAttendanceCalender,
   getAllTasks,
   createTask,
