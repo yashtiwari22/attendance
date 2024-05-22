@@ -1,5 +1,5 @@
 import db from "../config/connectDb.js";
-import { IsActive, UserStatus } from "../config/constants.js";
+import { IsActive, Role, UserStatus } from "../config/constants.js";
 import {
   sendResponseData,
   sendErrorResponse,
@@ -143,6 +143,7 @@ const getUserProfileDetails = async (req, res) => {
       department: department_name,
       user_status: UserStatus.getLabel(user.user_status),
       is_active: IsActive.getLabel(user.is_active),
+      role: Role.getLabel(user.role_id),
     };
 
     return sendResponseData(
