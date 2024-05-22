@@ -10,150 +10,202 @@ const getAllUsers = async (req, res) => {
   res.send(users);
 };
 
-const addLeaves = async (req, res) => {
-  const { leaves_type, leaves_value } = req.body;
+const addLeave = async (req, res) => {
+  try {
+    const { leave_type, leave_value } = req.body;
 
-  console.log(leaves_type, leaves_value);
+    console.log(leave_type, leave_value);
 
-  const query = `INSERT INTO admin_leaves_settings (leaves_type,leaves_value) VALUES (?, ?)`;
+    const query = `INSERT INTO admin_leaves_settings (leave_type,leave_value) VALUES (?, ?)`;
 
-  const [leaves] = await db.query(query, [leaves_type, leaves_value]);
+    const [leave] = await db.query(query, [leave_type, leave_value]);
 
-  if (!leaves.affectedRows) {
-    return sendResponse(404, "Leaves can't be added", res);
+    if (!leave.affectedRows) {
+      return sendResponse(404, "Leave can't be added", res);
+    }
+    return sendResponse(200, "Leave added successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Leaves added successfully", res);
 };
 
-const addPublicHolidays = async (req, res) => {
-  const { holiday_name, holiday_date } = req.body;
+const addPublicHoliday = async (req, res) => {
+  try {
+    const { holiday_name, holiday_date } = req.body;
 
-  console.log(holiday_name, holiday_date);
+    console.log(holiday_name, holiday_date);
 
-  const query = `INSERT INTO admin_public_holidays_settings (holiday_name,holiday_date) VALUES (?, ?)`;
+    const query = `INSERT INTO admin_public_holidays_settings (holiday_name,holiday_date) VALUES (?, ?)`;
 
-  const [holidays] = await db.query(query, [holiday_name, holiday_date]);
+    const [holiday] = await db.query(query, [holiday_name, holiday_date]);
 
-  if (!holidays.affectedRows) {
-    return sendResponse(404, "Holidays can't be added", res);
+    if (!holiday.affectedRows) {
+      return sendResponse(404, "Holiday can't be added", res);
+    }
+    return sendResponse(200, "Holiday added successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Holidays added successfully", res);
 };
 
-const addCompanyPolicies = async (req, res) => {
-  const { policy_name, policy_details } = req.body;
+const addCompanyPolicy = async (req, res) => {
+  try {
+    const { policy_name, policy_details } = req.body;
 
-  console.log(policy_name, policy_details);
+    console.log(policy_name, policy_details);
 
-  const query = `INSERT INTO admin_policies_settings (policy_name,policy_details) VALUES (?, ?)`;
+    const query = `INSERT INTO admin_policies_settings (policy_name,policy_details) VALUES (?, ?)`;
 
-  const [policies] = await db.query(query, [policy_name, policy_details]);
+    const [policy] = await db.query(query, [policy_name, policy_details]);
 
-  if (!policies.affectedRows) {
-    return sendResponse(404, "Policies can't be added", res);
+    if (!policy.affectedRows) {
+      return sendResponse(404, "Policy can't be added", res);
+    }
+    return sendResponse(200, "Policy added successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Policies added successfully", res);
 };
 
-const updateLeaves = async (req, res) => {
-  const { leaves_type, leaves_value } = req.body;
+const updateLeave = async (req, res) => {
+  try {
+    const { leaveId } = req.params;
+    const { leave_type, leave_value } = req.body;
 
-  console.log(leaves_type, leaves_value);
+    console.log(leaves_type, leaves_value);
 
-  const query = `INSERT INTO admin_leaves_settings (leaves_type,leaves_value) VALUES (?, ?)`;
+    const query = `UPDATE admin_leaves_settings SET leave_value = ? AND leave_type = ? WHERE id = ?`;
 
-  const [leaves] = await db.query(query, [leaves_type, leaves_value]);
+    const [updatedLeave] = await db.query(query, [
+      leave_value,
+      leave_type,
+      leaveId,
+    ]);
 
-  if (!leaves.affectedRows) {
-    return sendResponse(404, "Leaves can't be added", res);
+    if (updatedLeave.affectedRows === 0) {
+      return sendResponse(404, "Leave can't be updated", res);
+    }
+    return sendResponse(200, "Leave updated successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Leaves added successfully", res);
 };
 
-const updatePublicHolidays = async (req, res) => {
-  const { holiday_name, holiday_date } = req.body;
+const updatePublicHoliday = async (req, res) => {
+  try {
+    const { holidayId } = req.params;
+    const { holiday_name, holiday_date } = req.body;
 
-  console.log(holiday_name, holiday_date);
+    console.log(holiday_name, holiday_date);
 
-  const query = `INSERT INTO admin_public_holidays_settings (holiday_name,holiday_date) VALUES (?, ?)`;
+    const query = `UPDATE admin_public_holidays_settings SET holiday_name = ? AND holiday_date WHERE id = ?`;
 
-  const [holidays] = await db.query(query, [holiday_name, holiday_date]);
+    const [updatedPublicHoliday] = await db.query(query, [
+      holiday_name,
+      holiday_date,
+      holidayId,
+    ]);
 
-  if (!holidays.affectedRows) {
-    return sendResponse(404, "Holidays can't be added", res);
+    if (updatedPublicHoliday.affectedRows === 0) {
+      return sendResponse(404, "Public holiday can't be updated", res);
+    }
+    return sendResponse(200, "Public holiday updated successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Holidays added successfully", res);
 };
 
-const updateCompanyPolicies = async (req, res) => {
-  const { policy_name, policy_details } = req.body;
+const updateCompanyPolicy = async (req, res) => {
+  try {
+    const { policy_name, policy_details } = req.body;
 
-  console.log(policy_name, policy_details);
+    console.log(policy_name, policy_details);
 
-  const query = `INSERT INTO admin_policies_settings (policy_name,policy_details) VALUES (?, ?)`;
+    const query = `UPDATE admin_policies_settings SET leaves_value = ? WHERE leaves_type = ?`;
 
-  const [policies] = await db.query(query, [policy_name, policy_details]);
+    const [updatedCompanyPolicy] = await db.query(query, [
+      policy_name,
+      policy_details,
+    ]);
 
-  if (!policies.affectedRows) {
-    return sendResponse(404, "Policies can't be added", res);
+    if (updatedCompanyPolicy.affectedRows === 0) {
+      return sendResponse(404, "Leaves can't be updated", res);
+    }
+    return sendResponse(200, "Leaves updated successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Policies added successfully", res);
 };
 
-const deleteLeaves = async (req, res) => {
-  const { leaves_type, leaves_value } = req.body;
+const deleteLeave = async (req, res) => {
+  try {
+    const { leaveId } = req.params;
 
-  console.log(leaves_type, leaves_value);
+    if (!leaveId) {
+      return sendResponse(404, "Leave Id not provided", res);
+    }
 
-  const query = `INSERT INTO admin_leaves_settings (leaves_type,leaves_value) VALUES (?, ?)`;
+    const query = `DELETE FROM admin_leaves_settings WHERE id = ?)`;
 
-  const [leaves] = await db.query(query, [leaves_type, leaves_value]);
+    const [deletedLeave] = await db.query(query, [leaveId]);
 
-  if (!leaves.affectedRows) {
-    return sendResponse(404, "Leaves can't be added", res);
+    console.log(deletedLeave);
+
+    return sendResponse(200, "Leave deleted successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Leaves added successfully", res);
 };
 
-const deletePublicHolidays = async (req, res) => {
-  const { holiday_name, holiday_date } = req.body;
+const deletePublicHoliday = async (req, res) => {
+  try {
+    const { holidayId } = req.params;
 
-  console.log(holiday_name, holiday_date);
+    if (!holidayId) {
+      return sendResponse(404, "Holiday Id not provided", res);
+    }
 
-  const query = `INSERT INTO admin_public_holidays_settings (holiday_name,holiday_date) VALUES (?, ?)`;
+    const query = `DELETE FROM admin_public_holidays_settings WHERE id = ?)`;
 
-  const [holidays] = await db.query(query, [holiday_name, holiday_date]);
+    const [deletedHoliday] = await db.query(query, [holidayId]);
 
-  if (!holidays.affectedRows) {
-    return sendResponse(404, "Holidays can't be added", res);
+    console.log(deletedHoliday);
+
+    return sendResponse(200, "Public Holiday deleted successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Holidays added successfully", res);
 };
 
-const deleteCompanyPolicies = async (req, res) => {
-  const { policy_name, policy_details } = req.body;
+const deleteCompanyPolicy = async (req, res) => {
+  try {
+    const { policyId } = req.params;
 
-  console.log(policy_name, policy_details);
+    if (!policyId) {
+      return sendResponse(404, "Policy Id not provided", res);
+    }
 
-  const query = `INSERT INTO admin_policies_settings (policy_name,policy_details) VALUES (?, ?)`;
+    const query = `DELETE FROM admin_policies_settings WHERE id = ?)`;
 
-  const [policies] = await db.query(query, [policy_name, policy_details]);
+    const [deletedPolicy] = await db.query(query, [policyId]);
 
-  if (!policies.affectedRows) {
-    return sendResponse(404, "Policies can't be added", res);
+    console.log(deletedPolicy);
+
+    return sendResponse(200, "Policy deleted successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
   }
-  return sendResponse(200, "Policies added successfully", res);
 };
 
 export {
   getAllUsers,
-  addLeaves,
-  addPublicHolidays,
-  addCompanyPolicies,
-  updateLeaves,
-  updateCompanyPolicies,
-  updatePublicHolidays,
-  deleteCompanyPolicies,
-  deletePublicHolidays,
-  deleteLeaves,
+  addLeave,
+  addPublicHoliday,
+  addCompanyPolicy,
+  updateLeave,
+  updateCompanyPolicy,
+  updatePublicHoliday,
+  deleteCompanyPolicy,
+  deletePublicHoliday,
+  deleteLeave,
 };

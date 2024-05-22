@@ -35,20 +35,6 @@ const getPublicHolidays = async (req, res) => {
       return sendErrorResponse(400, "No user found in request", res);
     }
 
-    const [user_access] = await db.query(
-      `SELECT can_view_public_holidays FROM user_access WHERE user_id = ?`,
-      [user.id]
-    );
-
-    if (!user_access.length) {
-      return sendErrorResponse(400, "User can't access leaves settings", res);
-    }
-
-    const { can_view_public_holidays } = user_access[0];
-
-    if (!can_view_public_holidays) {
-      return sendErrorResponse(400, "Can't view leaves", res);
-    }
     const query = `SELECT * FROM admin_public_holidays_settings ORDER BY holiday_date`;
 
     const [public_holidays] = await db.query(query);
@@ -63,7 +49,9 @@ const getPublicHolidays = async (req, res) => {
       public_holidays,
       res
     );
-  } catch (error) {}
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
 };
 
 export { getTaskDetails, getPublicHolidays };
