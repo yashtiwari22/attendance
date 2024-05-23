@@ -268,73 +268,97 @@ const checkAttendance = async (req, res) => {
   }
 };
 
-const getAttendanceCalender = async (req, res) => {
+const getAttendanceCalendar = async (req, res) => {
   try {
     const user = req.user;
     const { month, year } = req.query;
-    // console.log(month, year);
 
     if (!month || !year) {
       return sendErrorResponse(400, "Month and Year are required", res);
     }
 
+    const daysInMonth = new Date(year, month, 0).getDate(); // Get the number of days in the given month
+
     const query = `
-    SELECT *  FROM attendance 
-    WHERE user_id = ? AND MONTH(date_time) = ? AND YEAR(date_time) = ?
-  `;
+      SELECT date_time, location FROM attendance 
+      WHERE user_id = ? AND MONTH(date_time) = ? AND YEAR(date_time) = ?
+    `;
 
     const [attendances] = await db.query(query, [user.id, month, year]);
 
-    // console.log(attendances);
-
     const leavesQuery = `
-    SELECT *  FROM leaves 
-    WHERE user_id = ? AND MONTH(leave_start) = ? AND YEAR(leave_end) = ?
-  `;
+      SELECT leave_start, leave_end, leave_status FROM leaves 
+      WHERE user_id = ? AND MONTH(leave_start) = ? AND YEAR(leave_end) = ?
+    `;
 
     const [leaves] = await db.query(leavesQuery, [user.id, month, year]);
 
-    // console.log(leaves);
-    const publicHolidaysQuery = `SELECT holiday_date FROM admin_public_holidays_settings `;
+    const publicHolidaysQuery = `
+      SELECT holiday_date FROM admin_public_holidays_settings 
+      WHERE MONTH(holiday_date) = ? AND YEAR(holiday_date) = ?
+    `;
 
     const [public_holidays] = await db.query(publicHolidaysQuery, [
       month,
       year,
     ]);
-    // console.log(public_holidays);
-    // Prepare a set of public holiday dates for quick lookup
+
     const publicHolidayDates = new Set(
       public_holidays.map(
         (holiday) => holiday.holiday_date.toISOString().split("T")[0]
       )
     );
-    console.log(publicHolidayDates);
 
-    // Transform the response to the desired format
-    const formattedAttendances = attendances.map((att) => {
-      const attendanceDate = att.date_time.toISOString().split("T")[0];
+    const formattedAttendances = [];
 
-      console.log(attendanceDate);
-      const isLeave = leaves.some((leave) => {
-        const leaveStart = leave.leave_start.toISOString().split("T")[0];
-        const leaveEnd = leave.leave_end.toISOString().split("T")[0];
-        return (
-          attendanceDate >= leaveStart &&
-          attendanceDate <= leaveEnd &&
-          leaveStart.leave_status
-        );
-      });
-      const isPublicHoliday = publicHolidayDates.has(attendanceDate);
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month - 1, day + 1)
+        .toISOString()
+        .split("T")[0];
+      console.log(currentDate);
 
-      return {
-        date: attendanceDate,
-        checkInTime: att.date_time.toISOString().split("T")[1].split(".")[0], // Extract time part
-        checkInLocation: att.location,
+      let isLeave = false;
+      let isPublicHoliday = publicHolidayDates.has(currentDate);
+      let checkInTime = null;
+      let location = null;
+
+      for (const att of attendances) {
+        const attendanceDate = att.date_time.toISOString().split("T")[0];
+        if (attendanceDate === currentDate) {
+          checkInTime = att.date_time.toISOString().split("T")[1].split(".")[0];
+          location = att.location;
+          break;
+        }
+      }
+
+      if (!isPublicHoliday) {
+        for (const leave of leaves) {
+          const leaveStart = leave.leave_start.toISOString().split("T")[0];
+          const leaveEnd = leave.leave_end.toISOString().split("T")[0];
+          if (
+            currentDate >= leaveStart &&
+            currentDate <= leaveEnd &&
+            leave.leave_status
+          ) {
+            isLeave = true;
+            checkInTime = null;
+            location = null;
+            break;
+          }
+        }
+      }
+
+      formattedAttendances.push({
+        date: currentDate,
+        checkInTime,
+        location,
         isLeave,
         isPublicHoliday,
-      };
-    });
-    // console.log(formattedAttendances);
+      });
+    }
+    // Sort the response array chronologically based on the date
+    formattedAttendances.sort((a, b) => new Date(a.date) - new Date(b.date));
+
     return sendResponseData(200, "attendance", formattedAttendances, res);
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
@@ -555,7 +579,7 @@ export {
   updateUserProfileDetails,
   markAttendance,
   checkAttendance,
-  getAttendanceCalender,
+  getAttendanceCalendar,
   getAllTasks,
   createTask,
   updateTask,
