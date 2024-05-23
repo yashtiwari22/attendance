@@ -54,7 +54,12 @@ const getPublicHolidays = async (req, res) => {
     };
 
     if (paginationInfo.totalPages < page) {
-      return sendErrorResponse(404, "Page not found", res);
+      return sendResponseData(
+        200,
+        "No public holdiays set by admin",
+        { public_holidays: [], pagination: paginationInfo },
+        res
+      );
     }
 
     const query = `SELECT * FROM admin_public_holidays_settings ORDER BY holiday_date LIMIT ? OFFSET ?`;
