@@ -35,18 +35,36 @@ const getPublicHolidays = async (req, res) => {
       return sendErrorResponse(400, "No user found in request", res);
     }
 
-    const query = `SELECT * FROM admin_public_holidays_settings ORDER BY holiday_date`;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-    const [public_holidays] = await db.query(query);
+    // Query to get the total count of public holidays
+
+    const countQuery = `SELECT COUNT(*) AS total FROM admin_public_holidays_settings`;
+    const [countResult] = await db.query(countQuery);
+    const totalPublicHolidays = countResult[0].total;
+
+    const query = `SELECT * FROM admin_public_holidays_settings ORDER BY holiday_date LIMIT ? OFFSET ?`;
+
+    const [public_holidays] = await db.query(query, [limit, offset]);
 
     if (public_holidays.length === 0) {
       return sendErrorResponse(200, "No public holdiays set by admin", [], res);
     }
 
+    // Include pagination info in the response
+    const paginationInfo = {
+      total_public_holidays: totalPublicHolidays,
+      page,
+      limit,
+      totalPages: Math.ceil(totalPublicHolidays / limit),
+    };
+
     return sendResponseData(
       200,
       "Public holidays retrieved",
-      public_holidays,
+      { public_holidays, pagination: paginationInfo },
       res
     );
   } catch (error) {

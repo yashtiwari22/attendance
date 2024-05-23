@@ -169,18 +169,32 @@ const updateUserProfileDetails = async (req, res) => {
       return sendErrorResponse(400, "No user found in request", res);
     }
 
-    const updateQuery = `UPDATE users SET display_name = ? ,image_url = ? WHERE id =?`;
+    const updates = [];
+    const values = [];
 
-    const [updatedUser] = await db.query(updateQuery, [
-      display_name,
-      image_url,
-      user.id,
-    ]);
+    if (display_name !== undefined) {
+      updates.push("display_name = ?");
+      values.push(display_name);
+    }
 
-    if (updatedUser.affectedRows === 0) {
+    if (image_url !== undefined) {
+      updates.push("image_url = ?");
+      values.push(image_url);
+    }
+
+    if (updates.length === 0) {
+      return sendErrorResponse(400, "No fields to update", res);
+    }
+
+    values.push(user.id);
+
+    const updateQuery = `UPDATE users SET ${updates.join(", ")} WHERE id = ?`;
+
+    const [result] = await db.query(updateQuery, values);
+
+    if (result.affectedRows === 0) {
       return sendErrorResponse(400, "User profile not updated", res);
     }
-    console.log(updatedUser);
     return sendResponse(200, "User profile updated successfully", res);
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
@@ -261,7 +275,7 @@ const getAttendanceCalender = async (req, res) => {
     // console.log(month, year);
 
     if (!month || !year) {
-      return sendErrorResponse(404, "Month and Year are required", res);
+      return sendErrorResponse(400, "Month and Year are required", res);
     }
 
     const query = `
@@ -336,16 +350,38 @@ const getAllTasks = async (req, res) => {
       return sendErrorResponse(400, "No user found in request", res);
     }
 
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const countTasksQuery = `SELECT COUNT(*) AS total FROM tasks where assigned_to = ?`;
+
+    const [countResult] = await db.query(countTasksQuery, [user.id]);
+    const totalTasks = countResult[0].total;
+
     const [tasks] = await db.query(
-      `SELECT * FROM tasks WHERE assigned_to = ?`,
-      [user.id]
+      `SELECT * FROM tasks WHERE assigned_to = ? LIMIT ? OFFSET ?`,
+      [user.id, limit, offset]
     );
 
     if (tasks.length === 0) {
       return sendResponseData(200, "Tasks not assigned to this user", [], res);
     }
 
-    return sendResponseData(200, "Tasks retrieved successfully", tasks, res);
+    // Include pagination info in the response
+    const paginationInfo = {
+      total_tasks: totalTasks,
+      page,
+      limit,
+      totalPages: Math.ceil(totalTasks / limit),
+    };
+
+    return sendResponseData(
+      200,
+      "Tasks retrieved successfully",
+      { tasks, pagination: paginationInfo },
+      res
+    );
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }
