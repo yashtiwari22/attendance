@@ -10,7 +10,7 @@ import {
   getAllLeaves,
   getLeaveDetail,
   requestLeave,
-  getAttendanceCalender,
+  getAttendanceCalendar,
   updateUserProfileDetails,
 } from "../controller/userController.js";
 import { verifyToken } from "../middlewares/authMiddleware.js";
@@ -31,7 +31,7 @@ userRouter.put(
 
 userRouter.post("/markAttendance", [verifyToken], markAttendance);
 userRouter.get("/checkAttendance", [verifyToken], checkAttendance);
-userRouter.get("/getAttendanceCalender", [verifyToken], getAttendanceCalender);
+userRouter.get("/getAttendanceCalendar", [verifyToken], getAttendanceCalendar);
 
 /* ---------------------------- Task Related APIs --------------------------- */
 
