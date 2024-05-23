@@ -312,7 +312,7 @@ const getAttendanceCalendar = async (req, res) => {
     const formattedAttendances = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month - 1, day + 1)
+      const currentDate = new Date(year, month - 1, day)
         .toISOString()
         .split("T")[0];
       console.log(currentDate);
