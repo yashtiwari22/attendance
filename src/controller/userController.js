@@ -5,6 +5,8 @@ import {
   sendErrorResponse,
   sendResponse,
 } from "../utils/response.js";
+
+/* ------------------------ User Detail Related Apis ------------------------ */
 const getUserAllDetails = async (req, res) => {
   try {
     const user = req.user;
@@ -200,6 +202,8 @@ const updateUserProfileDetails = async (req, res) => {
     return sendErrorResponse(500, error.message, res);
   }
 };
+
+/* ------------------------- Attendance Related Apis ------------------------ */
 const markAttendance = async (req, res) => {
   try {
     const user = req.user;
@@ -365,6 +369,8 @@ const getAttendanceCalendar = async (req, res) => {
   }
 };
 
+/* ---------------------------- Task related Apis --------------------------- */
+
 const getAllTasks = async (req, res) => {
   try {
     const user = req.user;
@@ -424,7 +430,6 @@ const createTask = async (req, res) => {
       is_urgent,
       assigned_date,
       deadline,
-      assignee_name,
     } = req.body;
 
     if (!user || Object.keys(user).length === 0) {
@@ -441,8 +446,7 @@ const createTask = async (req, res) => {
         assigned_to,
         is_urgent,
         assigned_date,
-        deadline,
-        assignee_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?
+        deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?
         )`,
       [
         name,
@@ -453,7 +457,6 @@ const createTask = async (req, res) => {
         is_urgent,
         assigned_date,
         deadline,
-        assignee_name,
       ]
     );
     if (!task || !task.insertId) {
@@ -498,6 +501,8 @@ const updateTask = async (req, res) => {
     return sendErrorResponse(500, error.message, res);
   }
 };
+
+/* --------------------------- Leave Related Apis --------------------------- */
 
 const getAllLeaves = async (req, res) => {
   try {
