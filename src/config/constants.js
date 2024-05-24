@@ -22,9 +22,21 @@ const UserStatus = {
 };
 
 const TaskStatus = {
-  REGULAR: { value: 0, label: "PENDING" },
-  PROBATIONAL: { value: 1, label: "DONE" },
-  INTERN: { value: 2, label: "UNDER REVIEW" },
+  PENDING: { value: 0, label: "PENDING" },
+  DONE: { value: 1, label: "DONE" },
+  UNDER_REVIEW: { value: 2, label: "UNDER_REVIEW" },
+  getLabel: function (value) {
+    return Object.values(this).find((status) => status.value === value)?.label;
+  },
+  getValue: function (label) {
+    return Object.values(this).find((status) => status.label === label)?.value;
+  },
+};
+
+const LeaveStatus = {
+  PENDING: { value: 0, label: "PENDING" },
+  APPROVED: { value: 1, label: "APPROVED" },
+  REJECTED: { value: 2, label: "REJECTED" },
   getLabel: function (value) {
     return Object.values(this).find((status) => status.value === value)?.label;
   },
@@ -44,4 +56,4 @@ const IsActive = {
   },
 };
 
-export { Role, UserStatus, TaskStatus, IsActive };
+export { Role, UserStatus, TaskStatus,LeaveStatus, IsActive };
