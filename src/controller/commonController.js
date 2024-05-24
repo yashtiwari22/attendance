@@ -56,7 +56,7 @@ const getPublicHolidays = async (req, res) => {
     if (paginationInfo.totalPages < page) {
       return sendResponseData(
         200,
-        "No public holdiays set by admin",
+        "No Page Found",
         { public_holidays: [], pagination: paginationInfo },
         res
       );

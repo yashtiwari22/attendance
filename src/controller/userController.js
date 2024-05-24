@@ -1,5 +1,5 @@
 import db from "../config/connectDb.js";
-import { IsActive, Role, UserStatus } from "../config/constants.js";
+import { IsActive, Role, TaskStatus, UserStatus } from "../config/constants.js";
 import {
   sendResponseData,
   sendErrorResponse,
@@ -383,26 +383,39 @@ const getAllTasks = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    const searchStatus =
+      req.query.status != undefined ? parseInt(req.query.status) : undefined;
 
-    const countTasksQuery = `SELECT COUNT(*) AS total FROM tasks where assigned_to = ?`;
+    console.log(req.query.status);
 
-    const [countResult] = await db.query(countTasksQuery, [user.id]);
+    let countTasksQuery = `SELECT COUNT(*) AS total FROM tasks where assigned_to = ?`;
+
+    let tasksQuery = `
+      SELECT 
+        t.*, 
+        CONCAT(assigneeUser.first_name, ' ', assigneeUser.last_name) AS assignee_name, 
+        CONCAT(assignedToUser.first_name, ' ', assignedToUser.last_name) AS assigned_user_name 
+      FROM tasks t
+      LEFT JOIN users assigneeUser ON t.assignee = assigneeUser.id
+      LEFT JOIN users assignedToUser ON t.assigned_to = assignedToUser.id
+      WHERE t.assigned_to = ?`;
+
+    let countQueryParams = [user.id];
+    let tasksQueryParams = [user.id];
+
+    if (searchStatus != undefined) {
+      countTasksQuery += ` AND status = ?`;
+      tasksQuery += ` AND t.status = ?`;
+      countQueryParams.push(searchStatus);
+      tasksQueryParams.push(searchStatus);
+    }
+
+    tasksQuery += ` LIMIT ? OFFSET ?`;
+
+    tasksQueryParams.push(limit, offset);
+
+    const [countResult] = await db.query(countTasksQuery, countQueryParams);
     const totalTasks = countResult[0].total;
-
-    const tasksQuery = `
-    SELECT 
-      t.*, 
-      CONCAT(assigneeUser.first_name, ' ', assigneeUser.last_name) AS assignee_name, 
-      CONCAT(assignedToUser.first_name, ' ', assignedToUser.last_name) AS assigned_user_name 
-    FROM tasks t
-    LEFT JOIN users assigneeUser ON t.assignee = assigneeUser.id
-    LEFT JOIN users assignedToUser ON t.assigned_to = assignedToUser.id
-    WHERE t.assigned_to = ? 
-    LIMIT ? OFFSET ?
-  `;
-
-    const [tasks] = await db.query(tasksQuery, [user.id, limit, offset]);
-
     // Include pagination info in the response
     const paginationInfo = {
       total_tasks: totalTasks,
@@ -410,6 +423,21 @@ const getAllTasks = async (req, res) => {
       limit,
       totalPages: Math.ceil(totalTasks / limit),
     };
+
+    if (paginationInfo.totalPages < page) {
+      return sendResponseData(
+        200,
+        "No Page Found",
+        { tasks: [], pagination: paginationInfo },
+        res
+      );
+    }
+
+    const [tasks] = await db.query(tasksQuery, tasksQueryParams);
+
+    tasks.map((task) => {
+      task.status = TaskStatus.getLabel(task.status);
+    });
 
     const message =
       tasks.length === 0
@@ -432,15 +460,8 @@ const createTask = async (req, res) => {
     const user = req.user;
     console.log(user);
 
-    const {
-      name,
-      description,
-      assignee,
-      status,
-      is_urgent,
-      assigned_date,
-      deadline,
-    } = req.body;
+    const { name, description, assignee, is_urgent, assigned_date, deadline } =
+      req.body;
 
     if (!user || Object.keys(user).length === 0) {
       return sendErrorResponse(400, "No user found in request", res);
@@ -462,7 +483,7 @@ const createTask = async (req, res) => {
         name,
         description,
         assignee,
-        status,
+        0,
         user.id,
         is_urgent,
         assigned_date,
