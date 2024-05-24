@@ -76,6 +76,10 @@ const getUserAllDetails = async (req, res) => {
 
     let [tasks] = await db.query(tasksQuery, [user.id, 0]);
 
+    tasks.map((task) => {
+      task.status = TaskStatus.getLabel(task.status);
+    });
+
     // Query to count all pending tasks
     const pendingTasksCountQuery = `
         SELECT COUNT(*) AS pending_tasks_count 
