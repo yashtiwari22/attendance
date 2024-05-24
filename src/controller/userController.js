@@ -5,6 +5,8 @@ import {
   sendErrorResponse,
   sendResponse,
 } from "../utils/response.js";
+
+/* ------------------------ User Detail Related Apis ------------------------ */
 const getUserAllDetails = async (req, res) => {
   try {
     const user = req.user;
@@ -200,6 +202,8 @@ const updateUserProfileDetails = async (req, res) => {
     return sendErrorResponse(500, error.message, res);
   }
 };
+
+/* ------------------------- Attendance Related Apis ------------------------ */
 const markAttendance = async (req, res) => {
   try {
     const user = req.user;
@@ -365,6 +369,8 @@ const getAttendanceCalendar = async (req, res) => {
   }
 };
 
+/* ---------------------------- Task related Apis --------------------------- */
+
 const getAllTasks = async (req, res) => {
   try {
     const user = req.user;
@@ -383,14 +389,19 @@ const getAllTasks = async (req, res) => {
     const [countResult] = await db.query(countTasksQuery, [user.id]);
     const totalTasks = countResult[0].total;
 
-    const [tasks] = await db.query(
-      `SELECT * FROM tasks WHERE assigned_to = ? LIMIT ? OFFSET ?`,
-      [user.id, limit, offset]
-    );
+    const tasksQuery = `
+    SELECT 
+      t.*, 
+      CONCAT(assigneeUser.first_name, ' ', assigneeUser.last_name) AS assignee_name, 
+      CONCAT(assignedToUser.first_name, ' ', assignedToUser.last_name) AS assigned_user_name 
+    FROM tasks t
+    LEFT JOIN users assigneeUser ON t.assignee = assigneeUser.id
+    LEFT JOIN users assignedToUser ON t.assigned_to = assignedToUser.id
+    WHERE t.assigned_to = ? 
+    LIMIT ? OFFSET ?
+  `;
 
-    if (tasks.length === 0) {
-      return sendResponseData(200, "Tasks not assigned to this user", [], res);
-    }
+    const [tasks] = await db.query(tasksQuery, [user.id, limit, offset]);
 
     // Include pagination info in the response
     const paginationInfo = {
@@ -400,9 +411,14 @@ const getAllTasks = async (req, res) => {
       totalPages: Math.ceil(totalTasks / limit),
     };
 
+    const message =
+      tasks.length === 0
+        ? "No tasks assigned to this user"
+        : "Tasks retrieved successfully";
+
     return sendResponseData(
       200,
-      "Tasks retrieved successfully",
+      message,
       { tasks, pagination: paginationInfo },
       res
     );
@@ -424,7 +440,6 @@ const createTask = async (req, res) => {
       is_urgent,
       assigned_date,
       deadline,
-      assignee_name,
     } = req.body;
 
     if (!user || Object.keys(user).length === 0) {
@@ -441,8 +456,7 @@ const createTask = async (req, res) => {
         assigned_to,
         is_urgent,
         assigned_date,
-        deadline,
-        assignee_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?
+        deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?
         )`,
       [
         name,
@@ -453,7 +467,6 @@ const createTask = async (req, res) => {
         is_urgent,
         assigned_date,
         deadline,
-        assignee_name,
       ]
     );
     if (!task || !task.insertId) {
@@ -498,6 +511,8 @@ const updateTask = async (req, res) => {
     return sendErrorResponse(500, error.message, res);
   }
 };
+
+/* --------------------------- Leave Related Apis --------------------------- */
 
 const getAllLeaves = async (req, res) => {
   try {
