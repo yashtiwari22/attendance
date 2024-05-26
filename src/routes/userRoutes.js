@@ -6,6 +6,7 @@ import {
   checkAttendance,
   getAllTasks,
   createTask,
+  deleteTask,
   updateTask,
   getAllLeaves,
   getLeaveDetail,
@@ -37,6 +38,7 @@ userRouter.get("/getAttendanceCalendar", [verifyToken], getAttendanceCalendar);
 
 userRouter.get("/getAllTasks", [verifyToken], getAllTasks);
 userRouter.post("/createTask", [verifyToken], createTask);
+userRouter.delete("/deleteTask/:taskId", [verifyToken], deleteTask);
 userRouter.put("/updateTask/:taskId", [verifyToken], updateTask);
 
 /* --------------------------- Leaves Related APIs -------------------------- */

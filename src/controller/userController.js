@@ -512,6 +512,29 @@ const createTask = async (req, res) => {
   }
 };
 
+const deleteTask = async (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+    if (!taskId) {
+      return sendErrorResponse(400, "Task ID not provided", res);
+    }
+
+    const query = `DELETE FROM tasks WHERE id = ? `;
+
+    const [result] = await db.query(query, [taskId]);
+
+    console.log(result);
+
+    if (result.affectedRows === 0) {
+      return sendErrorResponse(404, "Task not found", res);
+    }
+
+    return sendResponse(200, "Task deleted successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+
 const updateTask = async (req, res) => {
   try {
     const taskId = req.params.taskId;
@@ -622,6 +645,7 @@ export {
   getAttendanceCalendar,
   getAllTasks,
   createTask,
+  deleteTask,
   updateTask,
   getAllLeaves,
   getLeaveDetail,
