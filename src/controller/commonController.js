@@ -89,14 +89,49 @@ const getPublicHolidays = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const query = `SELECT id,first_name,last_name,role_id FROM users`;
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-    const [users] = await db.query(query);
+    // Search parameter
+    const searchName = req.query.name ? `%${req.query.name}%` : "%";
 
-    if (users.length === 0) {
-      return sendResponseData(200, "No users", [], res);
+    // Count query to get total number of users matching the search criteria
+    const countUsersQuery = `SELECT COUNT(*) AS total FROM users WHERE CONCAT(first_name, ' ', last_name) LIKE ?`;
+
+    // Main query to get paginated users matching the search criteria
+    const usersQuery = `
+      SELECT id, first_name, last_name, email, role_id
+      FROM users
+      WHERE CONCAT(first_name, ' ', last_name) LIKE ?
+      LIMIT ? OFFSET ?`;
+
+    // Execute count query
+    const [countResult] = await db.query(countUsersQuery, [searchName]);
+    const totalUsers = countResult[0].total;
+    // Include pagination info in the response
+    const paginationInfo = {
+      total_users: totalUsers,
+      page,
+      limit,
+      totalPages: Math.ceil(totalUsers / limit),
+    };
+
+    // If requested page exceeds total pages, return an empty result
+    if (paginationInfo.totalPages < page) {
+      return sendResponseData(
+        200,
+        "No Page Found",
+        { users: [], pagination: paginationInfo },
+        res
+      );
     }
 
+    // Execute main query
+    const [users] = await db.query(usersQuery, [searchName, limit, offset]);
+
+    // Process the user data
     users.map((user) => {
       user.name = `${user.first_name} ${user.last_name}`;
       user.role = Role.getLabel(user.role_id);
@@ -105,7 +140,15 @@ const getAllUsers = async (req, res) => {
       delete user.role_id;
     });
 
-    return sendResponseData(200, "Users retrieved", users, res);
+    const message =
+      users.length === 0 ? "No users found" : "Users retrieved successfully";
+
+    return sendResponseData(
+      200,
+      message,
+      { users, pagination: paginationInfo },
+      res
+    );
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }
