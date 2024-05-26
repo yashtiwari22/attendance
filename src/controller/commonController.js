@@ -1,4 +1,5 @@
 import db from "../config/connectDb.js";
+import { Role, UserStatus } from "../config/constants.js";
 import {
   sendErrorResponse,
   sendErrorResponseData,
@@ -86,4 +87,28 @@ const getPublicHolidays = async (req, res) => {
   }
 };
 
-export { getTaskDetails, getPublicHolidays };
+const getAllUsers = async (req, res) => {
+  try {
+    const query = `SELECT id,first_name,last_name,role_id FROM users`;
+
+    const [users] = await db.query(query);
+
+    if (users.length === 0) {
+      return sendResponseData(200, "No users", [], res);
+    }
+
+    users.map((user) => {
+      user.name = `${user.first_name} ${user.last_name}`;
+      user.role = Role.getLabel(user.role_id);
+      delete user.first_name;
+      delete user.last_name;
+      delete user.role_id;
+    });
+
+    return sendResponseData(200, "Users retrieved", users, res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+
+export { getTaskDetails, getPublicHolidays, getAllUsers };
