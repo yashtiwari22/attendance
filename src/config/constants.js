@@ -47,7 +47,7 @@ const LeaveStatus = {
 
 const LeaveType = {
   Casual: { value: 0, label: "Casual" },
-  Annual: { value: 1, label: "ANNUAL" },
+  Annual: { value: 1, label: "Annual" },
   getLabel: function (value) {
     return Object.values(this).find((status) => status.value === value)?.label;
   },

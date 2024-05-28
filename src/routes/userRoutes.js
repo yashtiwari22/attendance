@@ -45,7 +45,7 @@ userRouter.put("/updateTask/:taskId", [verifyToken], updateTask);
 
 userRouter.get("/getAllLeaves", [verifyToken], getAllLeaves);
 userRouter.get("/getLeaveDetail/:leaveId", [verifyToken], getLeaveDetail);
-userRouter.get("/requestLeave/:leaveId", [verifyToken], requestLeave);
+userRouter.post("/requestLeave", [verifyToken], requestLeave);
 
 // userRouter.get("/getSettings", [verifyToken], getSettings);
 
