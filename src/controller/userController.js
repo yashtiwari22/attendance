@@ -1,5 +1,12 @@
 import db from "../config/connectDb.js";
-import { IsActive, Role, TaskStatus, UserStatus } from "../config/constants.js";
+import {
+  IsActive,
+  LeaveStatus,
+  LeaveType,
+  Role,
+  TaskStatus,
+  UserStatus,
+} from "../config/constants.js";
 import {
   sendResponseData,
   sendErrorResponse,
@@ -404,6 +411,13 @@ const getAllTasks = async (req, res) => {
       LEFT JOIN users assignedToUser ON t.assigned_to = assignedToUser.id
       WHERE t.assigned_to = ?`;
 
+    // Query to count all pending tasks
+    const pendingTasksCountQuery = `
+      SELECT COUNT(*) AS pending_tasks_count 
+      FROM tasks 
+      WHERE assigned_to = ? AND status = ?
+    `;
+
     let countQueryParams = [user.id];
     let tasksQueryParams = [user.id];
 
@@ -443,6 +457,12 @@ const getAllTasks = async (req, res) => {
       task.status = TaskStatus.getLabel(task.status);
     });
 
+    let [pending_tasks_count] = await db.query(pendingTasksCountQuery, [
+      user.id,
+      0,
+    ]);
+    pending_tasks_count = pending_tasks_count[0].pending_tasks_count;
+
     const message =
       tasks.length === 0
         ? "No tasks assigned to this user"
@@ -451,7 +471,7 @@ const getAllTasks = async (req, res) => {
     return sendResponseData(
       200,
       message,
-      { tasks, pagination: paginationInfo },
+      { tasks, pending_tasks_count, pagination: paginationInfo },
       res
     );
   } catch (error) {
@@ -471,7 +491,28 @@ const createTask = async (req, res) => {
       return sendErrorResponse(400, "No user found in request", res);
     }
 
-    //create a new task for particular user
+    // Validate dates
+    const currentDate = new Date().setHours(0, 0, 0, 0); // Today's date with time set to 00:00:00
+    const assignedDate = new Date(assigned_date).setHours(0, 0, 0, 0); // Assigned date with time set to 00:00:00
+    const deadlineDate = new Date(deadline).setHours(0, 0, 0, 0); // Deadline date with time set to 00:00:00
+
+    if (isNaN(assignedDate) || assignedDate < currentDate) {
+      return sendErrorResponse(
+        400,
+        "Assigned date must be a valid date and ahead of the current datetime",
+        res
+      );
+    }
+
+    if (isNaN(deadlineDate) || deadlineDate < assignedDate) {
+      return sendErrorResponse(
+        400,
+        "Deadline must be a valid date and ahead of the assigned date",
+        res
+      );
+    }
+
+    // create a new task for particular user
 
     const [task] = await db.query(
       `INSERT INTO tasks (name,
@@ -489,7 +530,7 @@ const createTask = async (req, res) => {
         assignee,
         0,
         user.id,
-        is_urgent,
+        is_urgent === undefined ? 0 : is_urgent,
         assigned_date,
         deadline,
       ]
@@ -571,15 +612,78 @@ const getAllLeaves = async (req, res) => {
       return sendErrorResponse(400, "No user found in request", res);
     }
 
-    const [leaves] = await db.query(`SELECT * FROM leaves WHERE user_id = ?`, [
-      user.id,
-    ]);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
-    if (leaves.length === 0) {
-      return sendResponseData(200, "No leaves created for this user", [], res);
+    const searchStatus =
+      req.query.status != undefined ? parseInt(req.query.status) : undefined;
+
+    let countLeavesQuery = `SELECT COUNT(*) AS total FROM leaves where user_id = ?`;
+
+    let leavesQuery = `SELECT l.*,CONCAT(requestUser.first_name,' ',requestUser.last_name) as requester_name,CONCAT(approvingUser.first_name,' ',approvingUser.last_name) as approver_name FROM leaves l LEFT JOIN users requestUser on l.user_id = requestUser.id LEFT JOIN users approvingUser on l.approved_by = approvingUser.id WHERE user_id = ?`;
+
+    let countQueryParams = [user.id];
+    let leavesQueryParams = [user.id];
+
+    if (searchStatus != undefined) {
+      countLeavesQuery += ` AND leave_status = ?`;
+      leavesQuery += ` AND leave_status = ?`;
+      countQueryParams.push(searchStatus);
+      leavesQueryParams.push(searchStatus);
     }
 
-    return sendResponseData(200, "Leaves retrieved successfully", leaves, res);
+    leavesQuery += ` LIMIT ? OFFSET ?`;
+
+    leavesQueryParams.push(limit, offset);
+
+    const [countResult] = await db.query(countLeavesQuery, countQueryParams);
+    const totalLeaves = countResult[0].total;
+
+    // Include pagination info in the response
+    const paginationInfo = {
+      total_leaves: totalLeaves,
+      page,
+      limit,
+      totalPages: Math.ceil(totalLeaves / limit),
+    };
+
+    if (totalLeaves === 0) {
+      return sendResponseData(
+        200,
+        "No Leaves Found for this user",
+        { leaves: [], pagination: paginationInfo },
+        res
+      );
+    }
+
+    if (paginationInfo.totalPages < page) {
+      return sendResponseData(
+        200,
+        "No Page Found",
+        { leaves: [], pagination: paginationInfo },
+        res
+      );
+    }
+
+    const [leaves] = await db.query(leavesQuery, leavesQueryParams);
+
+    leaves.map((leave) => {
+      leave.leave_status = LeaveStatus.getLabel(leave.leave_status);
+      leave.leave_type = LeaveType.getLabel(leave.leave_type);
+    });
+
+    const message =
+      leaves.length === 0
+        ? "No Leaves Found for this user"
+        : "Leaves retrieved successfully";
+
+    return sendResponseData(
+      200,
+      message,
+      { leaves, pagination: paginationInfo },
+      res
+    );
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }

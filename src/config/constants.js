@@ -45,6 +45,17 @@ const LeaveStatus = {
   },
 };
 
+const LeaveType = {
+  Casual: { value: 0, label: "Casual" },
+  Annual: { value: 1, label: "ANNUAL" },
+  getLabel: function (value) {
+    return Object.values(this).find((status) => status.value === value)?.label;
+  },
+  getValue: function (label) {
+    return Object.values(this).find((status) => status.label === label)?.value;
+  },
+};
+
 const IsActive = {
   ACTIVE: { value: 0, label: "Inactive" },
   INACTIVE: { value: 1, label: "Active" },
@@ -56,4 +67,4 @@ const IsActive = {
   },
 };
 
-export { Role, UserStatus, TaskStatus,LeaveStatus, IsActive };
+export { Role, UserStatus, TaskStatus, LeaveStatus, LeaveType, IsActive };
