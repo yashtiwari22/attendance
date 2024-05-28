@@ -717,24 +717,58 @@ const getLeaveDetail = async (req, res) => {
 };
 const requestLeave = async (req, res) => {
   try {
-    const taskId = req.params.taskId;
-    if (!taskId) {
-      return sendErrorResponse(400, "Task ID not provided", res);
+    const { user } = req;
+    const { start_date, end_date, description, leave_type } = req.body;
+
+    // Validate required fields
+    if (!start_date || !end_date || !leave_type || !description) {
+      return sendErrorResponse(400, "Missing required fields", res);
     }
 
-    const { status } = req.body;
+    if (!user || Object.keys(user).length === 0) {
+      return sendErrorResponse(400, "No user found in request", res);
+    }
+    // Validate date format and values
+    const startDate = new Date(start_date);
+    const endDate = new Date(end_date);
+    const today = new Date();
 
-    const query = `UPDATE tasks SET status = ? WHERE id = ? `;
-
-    const [result] = await db.query(query, [status, taskId]);
-
-    console.log(result);
-
-    if (result.affectedRows === 0) {
-      return sendErrorResponse(404, "Task not found or unauthorized", res);
+    if (isNaN(startDate) || isNaN(endDate)) {
+      return sendErrorResponse(400, "Invalid date format", res);
     }
 
-    return sendResponse(200, "Task updated successfully", res);
+    if (endDate < startDate) {
+      return sendErrorResponse(
+        400,
+        "End date cannot be before start date",
+        res
+      );
+    }
+
+    if (startDate < today.setHours(0, 0, 0, 0)) {
+      return sendErrorResponse(400, "Start date cannot be in the past", res);
+    }
+    // Validate leave type
+    const leaveTypeValue = LeaveType.getValue(leave_type);
+    if (leaveTypeValue === undefined) {
+      return sendErrorResponse(400, "Invalid leave type", res);
+    }
+
+    const requestQuery = `INSERT INTO leaves (user_id,description,request_date,leave_status,leave_type,leave_start,leave_end) values (?,? ,now() ,0,? ,?, ?)`;
+
+    const [requestLeave] = await db.query(requestQuery, [
+      user.id,
+      description,
+      leaveTypeValue,
+      start_date,
+      end_date,
+    ]);
+
+    if (requestLeave.affectedRows === 0) {
+      return sendErrorResponse(400, "Failed to request leave", res);
+    }
+
+    return sendResponse(200, "Requested Leave Successfully", res);
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }
