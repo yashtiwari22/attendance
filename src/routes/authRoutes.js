@@ -1,6 +1,5 @@
 import { Router } from "express";
 import {
-  signUp,
   login,
   logout,
   logoutFromEverywhere,
@@ -8,10 +7,6 @@ import {
 import { verifyToken } from "../middlewares/authMiddleware.js";
 
 const authRouter = Router();
-
-/* ------------------------------ Signup Route ------------------------------ */
-
-authRouter.post("/signUp", signUp);
 
 /* ------------------------------- Login Route ------------------------------ */
 

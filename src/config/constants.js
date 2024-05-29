@@ -9,6 +9,19 @@ const Role = {
   },
 };
 
+const UserDepartment = {
+  Development: { value: 0, label: "DEVELOPMENT" },
+  Hr: { value: 1, label: "HR" },
+  Qa: { value: 1, label: "QA" },
+  Sales: { value: 1, label: "SALES" },
+  getLabel: function (value) {
+    return Object.values(this).find((role) => role.value === value)?.label;
+  },
+  getValue: function (label) {
+    return Object.values(this).find((role) => role.label === label)?.value;
+  },
+};
+
 const UserStatus = {
   REGULAR: { value: 0, label: "Regular" },
   PROBATIONAL: { value: 1, label: "Probational" },
@@ -67,4 +80,12 @@ const IsActive = {
   },
 };
 
-export { Role, UserStatus, TaskStatus, LeaveStatus, LeaveType, IsActive };
+export {
+  Role,
+  UserDepartment,
+  UserStatus,
+  TaskStatus,
+  LeaveStatus,
+  LeaveType,
+  IsActive,
+};

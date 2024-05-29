@@ -11,6 +11,7 @@ import {
   getAllLeaves,
   getLeaveDetail,
   requestLeave,
+  deleteLeaveRequest,
   getAttendanceCalendar,
   updateUserProfileDetails,
 } from "../controller/userController.js";
@@ -46,6 +47,11 @@ userRouter.put("/updateTask/:taskId", [verifyToken], updateTask);
 userRouter.get("/getAllLeaves", [verifyToken], getAllLeaves);
 userRouter.get("/getLeaveDetail/:leaveId", [verifyToken], getLeaveDetail);
 userRouter.post("/requestLeave", [verifyToken], requestLeave);
+userRouter.delete(
+  "/deleteLeaveRequest/:leaveId",
+  [verifyToken],
+  deleteLeaveRequest
+);
 
 // userRouter.get("/getSettings", [verifyToken], getSettings);
 
