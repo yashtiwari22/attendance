@@ -244,12 +244,12 @@ const getAllLeaveRequests = async (req, res) => {
       return sendResponseData(
         200,
         "No Page Found",
-        { users: [], pagination: paginationInfo },
+        { leave_requests: [], pagination: paginationInfo },
         res
       );
     }
 
-    const [leaveRequests] = await db.query(query, [0, limit, offset]);
+    const [leave_requests] = await db.query(query, [0, limit, offset]);
 
     if (leaveRequests.length === 0) {
       return sendResponseData(200, "No leave requests found", [], res);
@@ -258,7 +258,7 @@ const getAllLeaveRequests = async (req, res) => {
     return sendResponseData(
       200,
       "leave requests",
-      { leaveRequests, pagination: paginationInfo },
+      { leave_requests, pagination: paginationInfo },
       res
     );
   } catch (error) {
