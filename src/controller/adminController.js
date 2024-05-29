@@ -273,7 +273,7 @@ const updateLeaveRequest = async (req, res) => {
     const { leave_id } = req.params;
     const { leave_status } = req.body;
 
-    const query = `UPDATE leaves SET leave_status = ? ,approved_by = ?,approved_date = now() WHERE leave_id =?`;
+    const query = `UPDATE leaves SET leave_status = ? ,status_updated_by = ?,status_update_date = now() WHERE id =?`;
 
     const [updatedLeaveRequest] = await db.query(query, [
       LeaveStatus.getValue(leave_status),

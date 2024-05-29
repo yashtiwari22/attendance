@@ -23,27 +23,16 @@ const getUserAllDetails = async (req, res) => {
     }
 
     // Query to count annual leaves
-    const annualLeavesQuery = `SELECT COUNT(*) AS annual_leaves FROM leaves WHERE user_id = ? AND leave_type = ?`;
+    const annualLeavesQuery = `SELECT COUNT(*) AS annual_leaves FROM leaves WHERE user_id = ? AND leave_type = ? AND leave_status =?`;
 
     // Query to count casual leaves
-    const casualLeavesQuery = `SELECT COUNT(*) AS casual_leaves FROM leaves WHERE user_id = ? AND leave_type = ?`;
+    const casualLeavesQuery = `SELECT COUNT(*) AS casual_leaves FROM leaves WHERE user_id = ? AND leave_type = ? AND leave_status =?`;
 
-    let [annual_leaves] = await db.query(annualLeavesQuery, [user.id, 0]);
-    let [casual_leaves] = await db.query(casualLeavesQuery, [user.id, 1]);
+    let [annual_leaves] = await db.query(annualLeavesQuery, [user.id, 0, 1]);
+    let [casual_leaves] = await db.query(casualLeavesQuery, [user.id, 1, 1]);
 
     annual_leaves = annual_leaves[0].annual_leaves;
     casual_leaves = casual_leaves[0].casual_leaves;
-
-    // const [user_access] = await db.query(
-    //   `SELECT can_view_leaves FROM user_access WHERE user_id = ?`,
-    //   [user.id]
-    // );
-
-    // if (!user_access.length) {
-    //   return sendErrorResponse(400, "User can't access leaves settings", res);
-    // }
-
-    // const { can_view_leaves } = user_access[0];
 
     const settings = {};
 
@@ -621,7 +610,7 @@ const getAllLeaves = async (req, res) => {
 
     let countLeavesQuery = `SELECT COUNT(*) AS total FROM leaves where user_id = ?`;
 
-    let leavesQuery = `SELECT l.*,CONCAT(requestUser.first_name,' ',requestUser.last_name) as requester_name,CONCAT(approvingUser.first_name,' ',approvingUser.last_name) as approver_name FROM leaves l LEFT JOIN users requestUser on l.user_id = requestUser.id LEFT JOIN users approvingUser on l.approved_by = approvingUser.id WHERE user_id = ?`;
+    let leavesQuery = `SELECT l.*,CONCAT(requestUser.first_name,' ',requestUser.last_name) as requester_name,CONCAT(approvingUser.first_name,' ',approvingUser.last_name) as approver_name FROM leaves l LEFT JOIN users requestUser on l.user_id = requestUser.id LEFT JOIN users approvingUser on l.status_updated_by = approvingUser.id WHERE user_id = ?`;
 
     let countQueryParams = [user.id];
     let leavesQueryParams = [user.id];
