@@ -260,7 +260,7 @@ const getAllLeaveRequests = async (req, res) => {
 
     const [leave_requests] = await db.query(query, [0, limit, offset]);
 
-    if (leaveRequests.length === 0) {
+    if (leave_requests.length === 0) {
       return sendResponseData(200, "No leave requests found", [], res);
     }
 
