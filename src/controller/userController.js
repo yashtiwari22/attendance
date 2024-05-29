@@ -291,27 +291,58 @@ const getAttendanceCalendar = async (req, res) => {
     const [attendances] = await db.query(query, [user.id, month, year]);
 
     const leavesQuery = `
-      SELECT leave_start, leave_end, leave_status FROM leaves 
-      WHERE user_id = ? AND MONTH(leave_start) = ? AND YEAR(leave_end) = ?
+    SELECT leave_start, leave_end, leave_status FROM leaves 
+    WHERE user_id = ? AND (
+      (MONTH(leave_start) = ? AND YEAR(leave_start) = ?) OR 
+      (MONTH(leave_end) = ? AND YEAR(leave_end) = ?) OR 
+      (leave_start <= ? AND leave_end >= ?)
+    )
     `;
 
-    const [leaves] = await db.query(leavesQuery, [user.id, month, year]);
+    const [leaves] = await db.query(leavesQuery, [
+      user.id,
+      month,
+      year,
+      month,
+      year,
+      `${year}-${month}-01`,
+      `${year}-${month}-${daysInMonth}`,
+    ]);
 
     const publicHolidaysQuery = `
-      SELECT holiday_date FROM admin_public_holidays_settings 
-      WHERE MONTH(holiday_date) = ? AND YEAR(holiday_date) = ?
+    SELECT holiday_name, holiday_start_date, holiday_end_date 
+    FROM admin_public_holidays_settings 
+    WHERE (
+      (MONTH(holiday_start_date) = ? AND YEAR(holiday_start_date) = ?) OR 
+      (MONTH(holiday_end_date) = ? AND YEAR(holiday_end_date) = ?) OR 
+      (holiday_start_date <= ? AND holiday_end_date >= ?)
+    )
     `;
 
     const [public_holidays] = await db.query(publicHolidaysQuery, [
       month,
       year,
+      month,
+      year,
+      `${year}-${month}-01`,
+      `${year}-${month}-${daysInMonth}`,
     ]);
 
-    const publicHolidayDates = new Set(
-      public_holidays.map(
-        (holiday) => holiday.holiday_date.toISOString().split("T")[0]
-      )
-    );
+    console.log(public_holidays);
+
+    const publicHolidayDates = new Set();
+
+    public_holidays.forEach((holiday) => {
+      let current = new Date(holiday.holiday_start_date);
+      const end = new Date(holiday.holiday_end_date);
+
+      while (current <= end) {
+        publicHolidayDates.add(current.toISOString().split("T")[0]);
+        current.setDate(current.getDate() + 1);
+      }
+    });
+
+    console.log(publicHolidayDates);
 
     const formattedAttendances = [];
 
@@ -319,7 +350,6 @@ const getAttendanceCalendar = async (req, res) => {
       const currentDate = new Date(year, month - 1, day)
         .toISOString()
         .split("T")[0];
-      console.log(currentDate);
 
       let isLeave = false;
       let isPublicHoliday = publicHolidayDates.has(currentDate);

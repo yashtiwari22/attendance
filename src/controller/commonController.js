@@ -63,7 +63,7 @@ const getPublicHolidays = async (req, res) => {
       );
     }
 
-    const query = `SELECT * FROM admin_public_holidays_settings ORDER BY holiday_date LIMIT ? OFFSET ?`;
+    const query = `SELECT * FROM admin_public_holidays_settings ORDER BY holiday_start_date LIMIT ? OFFSET ?`;
 
     const [public_holidays] = await db.query(query, [limit, offset]);
 
