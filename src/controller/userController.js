@@ -774,6 +774,29 @@ const requestLeave = async (req, res) => {
   }
 };
 
+const deleteLeaveRequest = async (req, res) => {
+  try {
+    const leaveId = req.params.leaveId;
+    if (!leaveId) {
+      return sendErrorResponse(400, "Leave ID not provided", res);
+    }
+
+    const query = `DELETE FROM leaves WHERE id = ? `;
+
+    const [result] = await db.query(query, [leaveId]);
+
+    console.log(result);
+
+    if (result.affectedRows === 0) {
+      return sendErrorResponse(404, "Leave not found", res);
+    }
+
+    return sendResponse(200, "Leave deleted successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+
 export {
   getUserAllDetails,
   getUserProfileDetails,
@@ -788,4 +811,5 @@ export {
   getAllLeaves,
   getLeaveDetail,
   requestLeave,
+  deleteLeaveRequest,
 };

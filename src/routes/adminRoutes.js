@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { isSuperAdmin, verifyToken } from "../middlewares/authMiddleware.js";
 import {
+  createUser,
+  getUserDetails,
+  getAllLeaveRequests,
+  updateLeaveRequest,
+  getAllUsers,
   addCompanyPolicy,
   addLeave,
   addPublicHoliday,
@@ -10,9 +15,36 @@ import {
   updateCompanyPolicy,
   updateLeave,
   updatePublicHoliday,
+  getAttendanceCalendarForUser,
 } from "../controller/adminController.js";
 
 const adminRouter = Router();
+/* ------------------------- User Related Admin Apis ------------------------ */
+
+adminRouter.post("/createUser", [verifyToken, isSuperAdmin], createUser);
+adminRouter.get(
+  "/getUserDetails/:user_id",
+  [verifyToken, isSuperAdmin],
+  getUserDetails
+);
+
+adminRouter.get(
+  "/getAllLeaveRequests",
+  [verifyToken, isSuperAdmin],
+  getAllLeaveRequests
+);
+
+adminRouter.put(
+  "/updateLeaveRequest/:leave_id",
+  [verifyToken, isSuperAdmin],
+  updateLeaveRequest
+);
+
+adminRouter.get(
+  "/getAttendanceCalendarForUser/:user_id",
+  [verifyToken, isSuperAdmin],
+  getAttendanceCalendarForUser
+);
 
 /* ----------------------------- Add Admin Settings ----------------------------- */
 
@@ -48,17 +80,17 @@ adminRouter.put(
 
 /* -------------------------- Delete Admin Settings ------------------------- */
 
-adminRouter.put(
+adminRouter.delete(
   "/deleteLeave/:leaveId",
   [verifyToken, isSuperAdmin],
   deleteLeave
 );
-adminRouter.put(
+adminRouter.delete(
   "/deletePublicHoliday/:holidayId",
   [verifyToken, isSuperAdmin],
   deletePublicHoliday
 );
-adminRouter.put(
+adminRouter.delete(
   "/deleteCompanyPolicy/:policyId",
   [verifyToken, isSuperAdmin],
   deleteCompanyPolicy

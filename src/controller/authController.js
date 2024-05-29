@@ -1,6 +1,6 @@
 import db from "../config/connectDb.js";
 import bcrypt from "bcrypt";
-import { signupSchema, loginSchema } from "../utils/validation.js";
+import { loginSchema } from "../utils/validation.js";
 import {
   sendErrorResponse,
   sendResponse,
@@ -8,80 +8,6 @@ import {
 } from "../utils/response.js";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET_KEY } from "../config/secrets.js";
-
-const signUp = async (req, res) => {
-  try {
-    const {
-      display_name,
-      first_name,
-      last_name,
-      email,
-      phone,
-      password,
-      image_url,
-      designation,
-      department_id,
-      user_status,
-      is_active,
-      role_id,
-    } = req.body;
-    // Check if required fields are provided
-    const result = await signupSchema.validateAsync(req.body);
-
-    console.log(result);
-    // check if user already exists with same email
-
-    let userWithEmailOrPhone = await db.query(
-      `Select email,phone from users where email = ? OR phone = ?`,
-      [email, phone]
-    );
-    if (userWithEmailOrPhone[0].length > 0) {
-      return sendErrorResponse(
-        403,
-        "User elready exists with this email or phone",
-        res
-      );
-    }
-
-    //Insert into the database
-    const [user] = await db.query(
-      `INSERT INTO users (display_name,
-        first_name,
-        last_name,
-        email,
-        phone,
-        image_url,
-        designation,
-        department_id,
-        user_status,
-        is_active,
-        role_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())`,
-      [
-        display_name,
-        first_name,
-        last_name,
-        email,
-        phone,
-        image_url,
-        designation,
-        department_id,
-        user_status,
-        is_active,
-        role_id,
-      ]
-    );
-    console.log(user);
-    const user_id = user.insertId;
-
-    const createdPassword = await db.query(
-      `INSERT INTO password_manager (user_id,email,password) VALUES (?, ?, ?)`,
-      [user_id, email, bcrypt.hashSync(password, 10)]
-    );
-    return sendResponse(200, "User created successfully", res);
-  } catch (error) {
-    return sendErrorResponse(500, error.message, res);
-  }
-};
 
 const login = async (req, res) => {
   try {
@@ -170,4 +96,4 @@ const logout = async (req, res) => {
     return sendErrorResponse(500, error.message, res);
   }
 };
-export { signUp, login, logoutFromEverywhere, logout };
+export { login, logoutFromEverywhere, logout };

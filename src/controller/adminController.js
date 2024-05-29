@@ -1,14 +1,271 @@
 import db from "../config/connectDb.js";
 import {
+  Role,
+  UserDepartment,
+  IsActive,
+  LeaveStatus,
+  UserStatus,
+} from "../config/constants.js";
+import {
   sendErrorResponse,
   sendResponse,
   sendResponseData,
 } from "../utils/response.js";
-const getAllUsers = async (req, res) => {
-  const [users] = await db.query("SELECT * FROM users");
+import bcrypt from "bcrypt";
 
-  res.send(users);
+import { createUserSchema } from "../utils/validation.js";
+
+/* ---------------------------- User Related Apis --------------------------- */
+
+const createUser = async (req, res) => {
+  try {
+    const {
+      display_name,
+      first_name,
+      last_name,
+      email,
+      phone,
+      password,
+      image_url,
+      designation,
+      department_id,
+      user_status,
+      is_active,
+      role_id,
+    } = req.body;
+    // Check if required fields are provided
+    const result = await createUserSchema.validateAsync(req.body);
+
+    console.log(result);
+    // check if user already exists with same email
+
+    let userWithEmailOrPhone = await db.query(
+      `Select email,phone from users where email = ? OR phone = ?`,
+      [email, phone]
+    );
+    if (userWithEmailOrPhone[0].length > 0) {
+      return sendErrorResponse(
+        403,
+        "User elready exists with this email or phone",
+        res
+      );
+    }
+
+    //Insert into the database
+    const [user] = await db.query(
+      `INSERT INTO users (display_name,
+        first_name,
+        last_name,
+        email,
+        phone,
+        image_url,
+        designation,
+        department_id,
+        user_status,
+        is_active,
+        role_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())`,
+      [
+        display_name,
+        first_name,
+        last_name,
+        email,
+        phone,
+        image_url,
+        designation,
+        department_id,
+        user_status,
+        is_active,
+        role_id,
+      ]
+    );
+    console.log(user);
+    const user_id = user.insertId;
+
+    const createdPassword = await db.query(
+      `INSERT INTO password_manager (user_id,email,password) VALUES (?, ?, ?)`,
+      [user_id, email, bcrypt.hashSync(password, 10)]
+    );
+    return sendResponse(200, "User created successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
 };
+
+const getAttendanceCalendarForUser = async (req, res) => {
+  try {
+    const user = req.params.user_id;
+    const { month, year } = req.query;
+
+    if (!month || !year) {
+      return sendErrorResponse(400, "Month and Year are required", res);
+    }
+
+    const daysInMonth = new Date(year, month, 0).getDate(); // Get the number of days in the given month
+
+    const query = `
+      SELECT date_time, location FROM attendance 
+      WHERE user_id = ? AND MONTH(date_time) = ? AND YEAR(date_time) = ?
+    `;
+
+    const [attendances] = await db.query(query, [user, month, year]);
+
+    const leavesQuery = `
+      SELECT leave_start, leave_end, leave_status FROM leaves 
+      WHERE user_id = ? AND MONTH(leave_start) = ? AND YEAR(leave_end) = ?
+    `;
+
+    const [leaves] = await db.query(leavesQuery, [user, month, year]);
+
+    const publicHolidaysQuery = `
+      SELECT holiday_date FROM admin_public_holidays_settings 
+      WHERE MONTH(holiday_date) = ? AND YEAR(holiday_date) = ?
+    `;
+
+    const [public_holidays] = await db.query(publicHolidaysQuery, [
+      month,
+      year,
+    ]);
+
+    const publicHolidayDates = new Set(
+      public_holidays.map(
+        (holiday) => holiday.holiday_date.toISOString().split("T")[0]
+      )
+    );
+
+    const formattedAttendances = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month - 1, day)
+        .toISOString()
+        .split("T")[0];
+      console.log(currentDate);
+
+      let isLeave = false;
+      let isPublicHoliday = publicHolidayDates.has(currentDate);
+      let checkInTime = null;
+      let location = null;
+
+      for (const att of attendances) {
+        const attendanceDate = att.date_time.toISOString().split("T")[0];
+        if (attendanceDate === currentDate) {
+          checkInTime = att.date_time.toISOString().split("T")[1].split(".")[0];
+          location = att.location;
+          break;
+        }
+      }
+
+      if (!isPublicHoliday) {
+        for (const leave of leaves) {
+          const leaveStart = leave.leave_start.toISOString().split("T")[0];
+          const leaveEnd = leave.leave_end.toISOString().split("T")[0];
+          if (
+            currentDate >= leaveStart &&
+            currentDate <= leaveEnd &&
+            leave.leave_status
+          ) {
+            isLeave = true;
+            checkInTime = null;
+            location = null;
+            break;
+          }
+        }
+      }
+
+      formattedAttendances.push({
+        date: currentDate,
+        checkInTime,
+        location,
+        isLeave,
+        isPublicHoliday,
+      });
+    }
+    // Sort the response array chronologically based on the date
+    formattedAttendances.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    return sendResponseData(200, "attendance", formattedAttendances, res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+
+const getUserDetails = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const query = `SELECT * FROM users where id = ?`;
+    const [user] = await db.query(query, [user_id]);
+    console.log(user);
+
+    if (user.length === 0) {
+      return sendErrorResponse(404, "User not found", res);
+    }
+    const userData = user[0];
+
+    const responseData = {
+      ...userData,
+      department_id: UserDepartment.getLabel(userData.department_id),
+      user_status: UserStatus.getLabel(userData.user_status),
+      is_active: IsActive.getLabel(userData.is_active),
+      role_id: Role.getLabel(userData.role_id),
+    };
+
+    return sendResponseData(200, "user", responseData, res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+
+const getAllUsers = async (req, res) => {
+  try {
+    const [users] = await db.query("SELECT * FROM users");
+
+    res.send(users);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+
+const getAllLeaveRequests = async (req, res) => {
+  try {
+    const query = `Select * from leaves where leave_status = ?`;
+
+    const [leaveRequests] = await db.query(query, [0]);
+
+    if (leaveRequests.length === 0) {
+      return sendResponseData(200, "No leave requests found", [], res);
+    }
+
+    return sendResponseData(200, "leave requests", leaveRequests, res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+    s;
+  }
+};
+
+const updateLeaveRequest = async (req, res) => {
+  try {
+    const user = req.user;
+    const { leave_id } = req.params;
+    const { leave_status } = req.body;
+
+    const query = `UPDATE leaves SET leave_status = ? ,approved_by = ?,approved_date = now() WHERE leave_id =?`;
+
+    const [updatedLeaveRequest] = await db.query(query, [
+      LeaveStatus.getValue(leave_status),
+      user.id,
+      leave_id,
+    ]);
+
+    console.log(updatedLeaveRequest);
+
+    if (updatedLeaveRequest.affectedRows === 0) {
+      return sendErrorResponse(400, "Can't Update Leave Request", res);
+    }
+    return sendResponse(200, "Updated Leave Request", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+/* -------------------------- Settings related apis ------------------------- */
 
 const addLeave = async (req, res) => {
   try {
@@ -198,7 +455,11 @@ const deleteCompanyPolicy = async (req, res) => {
 };
 
 export {
+  createUser,
+  getUserDetails,
+  getAttendanceCalendarForUser,
   getAllUsers,
+  getAllLeaveRequests,
   addLeave,
   addPublicHoliday,
   addCompanyPolicy,
@@ -208,4 +469,5 @@ export {
   deleteCompanyPolicy,
   deletePublicHoliday,
   deleteLeave,
+  updateLeaveRequest,
 };
