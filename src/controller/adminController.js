@@ -220,7 +220,13 @@ const getAllLeaveRequests = async (req, res) => {
     // Count query to get total number of users matching the search criteria
     const countLeavesQuery = `SELECT COUNT(*) AS total FROM leaves WHERE leave_status = ?`;
 
-    const query = `Select * from leaves where leave_status = ?  LIMIT ? OFFSET ?`;
+    const query = `SELECT 
+    leaves.*, 
+    CONCAT( users.first_name," ",users.last_name) AS name,
+      users.designation, 
+    users.role_id, 
+    users.user_status 
+    FROM leaves JOIN users ON leaves.user_id = users.id WHERE leaves.leave_status = ? LIMIT ? OFFSET ?`;
 
     // Execute count query
     const [countResult] = await db.query(countLeavesQuery, [0]);
