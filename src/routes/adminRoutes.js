@@ -5,7 +5,6 @@ import {
   getUserDetails,
   getAllLeaveRequests,
   updateLeaveRequest,
-  getAllUsers,
   addCompanyPolicy,
   addLeave,
   addPublicHoliday,
@@ -45,8 +44,6 @@ adminRouter.get(
   [verifyToken, isSuperAdmin],
   getAttendanceCalendarForUser
 );
-
-adminRouter.get("/getAllUsers", [verifyToken, isSuperAdmin], getAllUsers);
 
 /* ----------------------------- Add Admin Settings ----------------------------- */
 
