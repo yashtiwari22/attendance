@@ -102,7 +102,7 @@ const getAllUsers = async (req, res) => {
 
     // Main query to get paginated users matching the search criteria
     const usersQuery = `
-      SELECT id, first_name, last_name, email, role_id
+      SELECT *
       FROM users
       WHERE CONCAT(first_name, ' ', last_name) LIKE ?
       LIMIT ? OFFSET ?`;
@@ -134,10 +134,8 @@ const getAllUsers = async (req, res) => {
     // Process the user data
     users.map((user) => {
       user.name = `${user.first_name} ${user.last_name}`;
-      user.role = Role.getLabel(user.role_id);
       delete user.first_name;
       delete user.last_name;
-      delete user.role_id;
     });
 
     const message =

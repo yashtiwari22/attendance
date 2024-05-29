@@ -210,35 +210,27 @@ const getUserDetails = async (req, res) => {
   }
 };
 
-const getAllUsers = async (req, res) => {
+const getAllLeaveRequests = async (req, res) => {
   try {
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // Search parameter
-    const searchName = req.query.name ? `%${req.query.name}%` : "%";
-
     // Count query to get total number of users matching the search criteria
-    const countUsersQuery = `SELECT COUNT(*) AS total FROM users WHERE CONCAT(first_name, ' ', last_name) LIKE ?`;
+    const countLeavesQuery = `SELECT COUNT(*) AS total FROM leaves WHERE leave_status = ?`;
 
-    // Main query to get paginated users matching the search criteria
-    const usersQuery = `
-      SELECT id, first_name, last_name, email, role_id
-      FROM users
-      WHERE CONCAT(first_name, ' ', last_name) LIKE ?
-      LIMIT ? OFFSET ?`;
+    const query = `Select * from leaves where leave_status = ?  LIMIT ? OFFSET ?`;
 
     // Execute count query
-    const [countResult] = await db.query(countUsersQuery, [searchName]);
-    const totalUsers = countResult[0].total;
+    const [countResult] = await db.query(countLeavesQuery, [0]);
+    const totalRequestedLeaves = countResult[0].total;
     // Include pagination info in the response
     const paginationInfo = {
-      total_users: totalUsers,
+      total_requested_leaves: totalRequestedLeaves,
       page,
       limit,
-      totalPages: Math.ceil(totalUsers / limit),
+      totalPages: Math.ceil(totalRequestedLeaves / limit),
     };
 
     // If requested page exceeds total pages, return an empty result
@@ -251,40 +243,18 @@ const getAllUsers = async (req, res) => {
       );
     }
 
-    // Execute main query
-    const [users] = await db.query(usersQuery, [searchName, limit, offset]);
-
-    // Process the user data
-    users.map((user) => {
-      user.name = `${user.first_name} ${user.last_name}`;
-      delete user.first_name;
-      delete user.last_name;
-    });
-
-    const message =
-      users.length === 0 ? "No users found" : "Users retrieved successfully";
-
-    return sendResponseData(
-      200,
-      message,
-      { users, pagination: paginationInfo },
-      res
-    );
-  } catch (error) {
-    return sendErrorResponse(500, error.message, res);
-  }
-};
-const getAllLeaveRequests = async (req, res) => {
-  try {
-    const query = `Select * from leaves where leave_status = ?`;
-
-    const [leaveRequests] = await db.query(query, [0]);
+    const [leaveRequests] = await db.query(query, [0, limit, offset]);
 
     if (leaveRequests.length === 0) {
       return sendResponseData(200, "No leave requests found", [], res);
     }
 
-    return sendResponseData(200, "leave requests", leaveRequests, res);
+    return sendResponseData(
+      200,
+      "leave requests",
+      { leaveRequests, pagination: paginationInfo },
+      res
+    );
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
     s;
@@ -508,7 +478,6 @@ export {
   createUser,
   getUserDetails,
   getAttendanceCalendarForUser,
-  getAllUsers,
   getAllLeaveRequests,
   addLeave,
   addPublicHoliday,
