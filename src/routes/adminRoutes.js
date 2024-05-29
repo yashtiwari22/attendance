@@ -46,6 +46,8 @@ adminRouter.get(
   getAttendanceCalendarForUser
 );
 
+adminRouter.get("/getAllUsers", [verifyToken, isSuperAdmin], getAllUsers);
+
 /* ----------------------------- Add Admin Settings ----------------------------- */
 
 adminRouter.post("/addLeave", [verifyToken, isSuperAdmin], addLeave);
