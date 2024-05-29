@@ -431,6 +431,15 @@ const getAllTasks = async (req, res) => {
       totalPages: Math.ceil(totalTasks / limit),
     };
 
+    if (totalTasks === 0) {
+      return sendResponseData(
+        200,
+        "No tasks found for this user",
+        { tasks: [], pagination: paginationInfo },
+        res
+      );
+    }
+
     if (paginationInfo.totalPages < page) {
       return sendResponseData(
         200,

@@ -239,6 +239,15 @@ const getAllLeaveRequests = async (req, res) => {
       totalPages: Math.ceil(totalRequestedLeaves / limit),
     };
 
+    if (totalRequestedLeaves === 0) {
+      return sendResponseData(
+        200,
+        "No request leaves found",
+        { leave_requests: [], pagination: paginationInfo },
+        res
+      );
+    }
+
     // If requested page exceeds total pages, return an empty result
     if (paginationInfo.totalPages < page) {
       return sendResponseData(
