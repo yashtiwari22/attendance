@@ -131,13 +131,6 @@ const getAllUsers = async (req, res) => {
     // Execute main query
     const [users] = await db.query(usersQuery, [searchName, limit, offset]);
 
-    // Process the user data
-    users.map((user) => {
-      user.name = `${user.first_name} ${user.last_name}`;
-      delete user.first_name;
-      delete user.last_name;
-    });
-
     const message =
       users.length === 0 ? "No users found" : "Users retrieved successfully";
 
