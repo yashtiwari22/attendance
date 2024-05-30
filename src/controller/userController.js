@@ -311,8 +311,6 @@ const getAttendanceCalendar = async (req, res) => {
       `${year}-${month}-${daysInMonth}`,
     ]);
 
-    console.log(leaves);
-
     const publicHolidaysQuery = `
       SELECT holiday_name, holiday_start_date, holiday_end_date 
       FROM admin_public_holidays_settings 
@@ -332,55 +330,40 @@ const getAttendanceCalendar = async (req, res) => {
       `${year}-${month}-${daysInMonth}`,
     ]);
 
-    console.log(public_holidays);
-
-    const convertToIST = (date) => {
-      return new Date(date).toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata",
-      });
-    };
-
-    const publicHolidayDates = new Set();
-
-    public_holidays.forEach((holiday) => {
-      let current = new Date(holiday.holiday_start_date);
-      const end = new Date(holiday.holiday_end_date);
-
-      while (current <= end) {
-        const currentIST = convertToIST(current).split(", ")[0];
-        publicHolidayDates.add(currentIST);
-        current.setDate(current.getDate() + 1);
-      }
-    });
-
-    console.log(publicHolidayDates);
-
     const formattedAttendances = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDateUTC = new Date(Date.UTC(year, month - 1, day));
-      const currentDateIST = convertToIST(currentDateUTC).split(", ")[0];
+      const currentDateISO = currentDateUTC.toISOString().split("T")[0];
 
       let isLeave = false;
-      let isPublicHoliday = publicHolidayDates.has(currentDateIST);
+      let isPublicHoliday = false;
       let checkInTime = null;
       let location = null;
 
-      for (const att of attendances) {
-        const attendanceDateIST = convertToIST(att.date_time).split(", ")[0];
-        if (attendanceDateIST === currentDateIST) {
-          checkInTime = convertToIST(att.date_time).split(", ")[1];
-          location = att.location;
+      // Check if the current date is a public holiday
+      for (const holiday of public_holidays) {
+        const holidayStart = new Date(holiday.holiday_start_date)
+          .toISOString()
+          .split("T")[0];
+        const holidayEnd = new Date(holiday.holiday_end_date)
+          .toISOString()
+          .split("T")[0];
+        if (currentDateISO >= holidayStart && currentDateISO <= holidayEnd) {
+          isPublicHoliday = true;
           break;
         }
       }
 
+      // Check if the current date is a leave day
       for (const leave of leaves) {
-        const leaveStartIST = convertToIST(leave.leave_start).split(", ")[0];
-        const leaveEndIST = convertToIST(leave.leave_end).split(", ")[0];
+        const leaveStart = new Date(leave.leave_start)
+          .toISOString()
+          .split("T")[0];
+        const leaveEnd = new Date(leave.leave_end).toISOString().split("T")[0];
         if (
-          currentDateIST >= leaveStartIST &&
-          currentDateIST <= leaveEndIST &&
+          currentDateISO >= leaveStart &&
+          currentDateISO <= leaveEnd &&
           leave.leave_status
         ) {
           isLeave = true;
@@ -388,8 +371,22 @@ const getAttendanceCalendar = async (req, res) => {
         }
       }
 
+      // Check attendance for the current date
+      for (const attendance of attendances) {
+        const attendanceDate = new Date(attendance.date_time)
+          .toISOString()
+          .split("T")[0];
+        if (currentDateISO === attendanceDate) {
+          checkInTime = new Date(attendance.date_time)
+            .toISOString()
+            .split("T")[1];
+          location = attendance.location;
+          break;
+        }
+      }
+
       formattedAttendances.push({
-        date: currentDateIST,
+        date: currentDateISO,
         checkInTime,
         location,
         isLeave,
