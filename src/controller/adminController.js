@@ -79,13 +79,93 @@ const createUser = async (req, res) => {
       ]
     );
     console.log(user);
+
+    if (user.affectedRows === 0) {
+      return sendErrorResponse(404, "User cannot be created", res);
+    }
     const user_id = user.insertId;
 
     const createdPassword = await db.query(
       `INSERT INTO password_manager (user_id,email,password) VALUES (?, ?, ?)`,
       [user_id, email, bcrypt.hashSync(password, 10)]
     );
-    return sendResponse(200, "User created successfully", res);
+
+    if (createdPassword.affectedRows === 0) {
+      return sendErrorResponse(404, "User cannot be created", res);
+    }
+    const responseData = {
+      inserted_id: user_id,
+    };
+    return sendResponseData(
+      200,
+      "User created successfully",
+      responseData,
+      res
+    );
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+
+const updateUser = async (req, res) => {
+  try {
+    const userId = req.params.user_id;
+    const updateFields = req.body;
+
+    // Check if the user exists
+    const existingUser = await db.query(`SELECT * FROM users WHERE id = ?`, [
+      userId,
+    ]);
+
+    if (existingUser[0].length === 0) {
+      return sendErrorResponse(404, "User not found", res);
+    }
+
+    // Construct the update query dynamically
+    let updateQuery = "UPDATE users SET ";
+    let queryParams = [];
+
+    Object.keys(updateFields).forEach((key, index) => {
+      updateQuery += `${key} = ?, `;
+      queryParams.push(updateFields[key]);
+    });
+
+    // Remove the trailing comma and add the WHERE clause
+    updateQuery = updateQuery.slice(0, -2);
+    updateQuery += ` WHERE id = ?`;
+    queryParams.push(userId);
+
+    // Execute the update query
+    const [updateUser] = await db.query(updateQuery, queryParams);
+
+    console.log(updateUser);
+
+    return sendResponse(200, "User updated successfully", res);
+  } catch (error) {
+    return sendErrorResponse(500, error.message, res);
+  }
+};
+const deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.user_id;
+
+    // Check if the user exists
+    const existingUser = await db.query(`SELECT * FROM users WHERE id = ?`, [
+      userId,
+    ]);
+
+    if (existingUser[0].length === 0) {
+      return sendErrorResponse(404, "User not found", res);
+    }
+    // Delete user from the database
+    const [deleteUser] = await db.query(`DELETE FROM users WHERE id = ?`, [
+      userId,
+    ]);
+
+    if (deleteUser.affectedRows === 0) {
+      return sendErrorResponse(404, "User cannot be deleted", res);
+    }
+    return sendResponse(200, "User deleted successfully", res);
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }
@@ -602,6 +682,8 @@ const deleteCompanyPolicy = async (req, res) => {
 
 export {
   createUser,
+  updateUser,
+  deleteUser,
   getUserDetails,
   getAttendanceCalendarForUser,
   getAllLeaveRequests,

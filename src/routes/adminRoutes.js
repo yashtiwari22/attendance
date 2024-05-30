@@ -2,6 +2,8 @@ import { Router } from "express";
 import { isSuperAdmin, verifyToken } from "../middlewares/authMiddleware.js";
 import {
   createUser,
+  updateUser,
+  deleteUser,
   getUserDetails,
   getAllLeaveRequests,
   updateLeaveRequest,
@@ -21,6 +23,17 @@ const adminRouter = Router();
 /* ------------------------- User Related Admin Apis ------------------------ */
 
 adminRouter.post("/createUser", [verifyToken, isSuperAdmin], createUser);
+adminRouter.put(
+  "/updateUser/:user_id",
+  [verifyToken, isSuperAdmin],
+  updateUser
+);
+adminRouter.delete(
+  "/deleteUser/:user_id",
+  [verifyToken, isSuperAdmin],
+  deleteUser
+);
+
 adminRouter.get(
   "/getUserDetails/:user_id",
   [verifyToken, isSuperAdmin],
