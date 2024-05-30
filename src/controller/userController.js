@@ -248,6 +248,8 @@ const checkAttendance = async (req, res) => {
     // Extract the date part from date_time to check for existing attendance
     const date = new Date(Date.now()).toISOString().split("T")[0];
 
+    console.log(date);
+
     // Check if the user has already marked attendance for the given day
     const [existingAttendance] = await db.query(
       `SELECT * FROM attendance WHERE user_id = ? AND DATE(date_time) = ?`,
@@ -281,7 +283,7 @@ const getAttendanceCalendar = async (req, res) => {
       return sendErrorResponse(400, "Month and Year are required", res);
     }
 
-    const daysInMonth = new Date(year, month, 0).getDate(); // Get the number of days in the given month
+    const daysInMonth = new Date(year, month, 0).getDate();
 
     const query = `
       SELECT date_time, location FROM attendance 
@@ -291,12 +293,12 @@ const getAttendanceCalendar = async (req, res) => {
     const [attendances] = await db.query(query, [user.id, month, year]);
 
     const leavesQuery = `
-    SELECT leave_start, leave_end, leave_status FROM leaves 
-    WHERE user_id = ? AND (
-      (MONTH(leave_start) = ? AND YEAR(leave_start) = ?) OR 
-      (MONTH(leave_end) = ? AND YEAR(leave_end) = ?) OR 
-      (leave_start <= ? AND leave_end >= ?)
-    )
+      SELECT leave_start, leave_end, leave_status FROM leaves 
+      WHERE user_id = ? AND (
+        (MONTH(leave_start) = ? AND YEAR(leave_start) = ?) OR 
+        (MONTH(leave_end) = ? AND YEAR(leave_end) = ?) OR 
+        (leave_start <= ? AND leave_end >= ?)
+      )
     `;
 
     const [leaves] = await db.query(leavesQuery, [
@@ -309,14 +311,16 @@ const getAttendanceCalendar = async (req, res) => {
       `${year}-${month}-${daysInMonth}`,
     ]);
 
+    console.log(leaves);
+
     const publicHolidaysQuery = `
-    SELECT holiday_name, holiday_start_date, holiday_end_date 
-    FROM admin_public_holidays_settings 
-    WHERE (
-      (MONTH(holiday_start_date) = ? AND YEAR(holiday_start_date) = ?) OR 
-      (MONTH(holiday_end_date) = ? AND YEAR(holiday_end_date) = ?) OR 
-      (holiday_start_date <= ? AND holiday_end_date >= ?)
-    )
+      SELECT holiday_name, holiday_start_date, holiday_end_date 
+      FROM admin_public_holidays_settings 
+      WHERE (
+        (MONTH(holiday_start_date) = ? AND YEAR(holiday_start_date) = ?) OR 
+        (MONTH(holiday_end_date) = ? AND YEAR(holiday_end_date) = ?) OR 
+        (holiday_start_date <= ? AND holiday_end_date >= ?)
+      )
     `;
 
     const [public_holidays] = await db.query(publicHolidaysQuery, [
@@ -330,6 +334,12 @@ const getAttendanceCalendar = async (req, res) => {
 
     console.log(public_holidays);
 
+    const convertToIST = (date) => {
+      return new Date(date).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      });
+    };
+
     const publicHolidayDates = new Set();
 
     public_holidays.forEach((holiday) => {
@@ -337,7 +347,8 @@ const getAttendanceCalendar = async (req, res) => {
       const end = new Date(holiday.holiday_end_date);
 
       while (current <= end) {
-        publicHolidayDates.add(current.toISOString().split("T")[0]);
+        const currentIST = convertToIST(current).split(", ")[0];
+        publicHolidayDates.add(currentIST);
         current.setDate(current.getDate() + 1);
       }
     });
@@ -347,49 +358,45 @@ const getAttendanceCalendar = async (req, res) => {
     const formattedAttendances = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month - 1, day)
-        .toISOString()
-        .split("T")[0];
+      const currentDateUTC = new Date(Date.UTC(year, month - 1, day));
+      const currentDateIST = convertToIST(currentDateUTC).split(", ")[0];
 
       let isLeave = false;
-      let isPublicHoliday = publicHolidayDates.has(currentDate);
+      let isPublicHoliday = publicHolidayDates.has(currentDateIST);
       let checkInTime = null;
       let location = null;
 
       for (const att of attendances) {
-        const attendanceDate = att.date_time.toISOString().split("T")[0];
-        if (attendanceDate === currentDate) {
-          checkInTime = att.date_time.toISOString().split("T")[1].split(".")[0];
+        const attendanceDateIST = convertToIST(att.date_time).split(", ")[0];
+        if (attendanceDateIST === currentDateIST) {
+          checkInTime = convertToIST(att.date_time).split(", ")[1];
           location = att.location;
           break;
         }
       }
 
-      if (!isPublicHoliday) {
-        for (const leave of leaves) {
-          const leaveStart = leave.leave_start.toISOString().split("T")[0];
-          const leaveEnd = leave.leave_end.toISOString().split("T")[0];
-          if (
-            currentDate >= leaveStart &&
-            currentDate <= leaveEnd &&
-            leave.leave_status
-          ) {
-            isLeave = true;
-            checkInTime = null;
-            location = null;
-            break;
-          }
+      for (const leave of leaves) {
+        const leaveStartIST = convertToIST(leave.leave_start).split(", ")[0];
+        const leaveEndIST = convertToIST(leave.leave_end).split(", ")[0];
+        if (
+          currentDateIST >= leaveStartIST &&
+          currentDateIST <= leaveEndIST &&
+          leave.leave_status
+        ) {
+          isLeave = true;
+          break;
         }
       }
 
       formattedAttendances.push({
-        date: currentDate,
+        date: currentDateIST,
         checkInTime,
         location,
         isLeave,
         isPublicHoliday,
       });
     }
+
     // Sort the response array chronologically based on the date
     formattedAttendances.sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -437,6 +444,12 @@ const getAllTasks = async (req, res) => {
       WHERE assigned_to = ? AND status = ?
     `;
 
+    let [pending_tasks_count] = await db.query(pendingTasksCountQuery, [
+      user.id,
+      0,
+    ]);
+    pending_tasks_count = pending_tasks_count[0].pending_tasks_count;
+
     let countQueryParams = [user.id];
     let tasksQueryParams = [user.id];
 
@@ -465,7 +478,7 @@ const getAllTasks = async (req, res) => {
       return sendResponseData(
         200,
         "No tasks found for this user",
-        { tasks: [], pagination: paginationInfo },
+        { tasks: [], pending_tasks_count, pagination: paginationInfo },
         res
       );
     }
@@ -474,7 +487,7 @@ const getAllTasks = async (req, res) => {
       return sendResponseData(
         200,
         "No Page Found",
-        { tasks: [], pagination: paginationInfo },
+        { tasks: [], pending_tasks_count, pagination: paginationInfo },
         res
       );
     }
@@ -484,12 +497,6 @@ const getAllTasks = async (req, res) => {
     tasks.map((task) => {
       task.status = TaskStatus.getLabel(task.status);
     });
-
-    let [pending_tasks_count] = await db.query(pendingTasksCountQuery, [
-      user.id,
-      0,
-    ]);
-    pending_tasks_count = pending_tasks_count[0].pending_tasks_count;
 
     const message =
       tasks.length === 0
