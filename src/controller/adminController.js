@@ -93,6 +93,7 @@ const createUser = async (req, res) => {
     if (createdPassword.affectedRows === 0) {
       return sendErrorResponse(404, "User cannot be created", res);
     }
+
     const responseData = {
       inserted_id: user_id,
     };
@@ -103,6 +104,9 @@ const createUser = async (req, res) => {
       res
     );
   } catch (error) {
+    if (error.isJoi) {
+      return sendErrorResponse(404, error.message, res);
+    }
     return sendErrorResponse(500, error.message, res);
   }
 };

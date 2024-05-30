@@ -1,13 +1,13 @@
 import Joi from "joi";
 
 export const createUserSchema = Joi.object({
-  display_name: Joi.string(),
+  display_name: Joi.string().allow(null).optional(),
   first_name: Joi.string().required(),
   last_name: Joi.string().required(),
   email: Joi.string().email().lowercase().required(),
   phone: Joi.string().required(),
   password: Joi.string().required().min(6),
-  image_url: Joi.string(),
+  image_url: Joi.string().allow(null).optional(),
   designation: Joi.string().required(),
   department_id: Joi.number().required(),
   user_status: Joi.number().required(),
