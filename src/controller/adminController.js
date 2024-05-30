@@ -100,7 +100,7 @@ const getAttendanceCalendarForUser = async (req, res) => {
       return sendErrorResponse(400, "Month and Year are required", res);
     }
 
-    const daysInMonth = new Date(year, month, 0).getDate(); // Get the number of days in the given month
+    const daysInMonth = new Date(year, month, 0).getDate();
 
     const query = `
       SELECT date_time, location FROM attendance 
@@ -110,12 +110,12 @@ const getAttendanceCalendarForUser = async (req, res) => {
     const [attendances] = await db.query(query, [user, month, year]);
 
     const leavesQuery = `
-    SELECT leave_start, leave_end, leave_status FROM leaves 
-    WHERE user_id = ? AND (
-      (MONTH(leave_start) = ? AND YEAR(leave_start) = ?) OR 
-      (MONTH(leave_end) = ? AND YEAR(leave_end) = ?) OR 
-      (leave_start <= ? AND leave_end >= ?)
-    )
+      SELECT leave_start, leave_end, leave_status FROM leaves 
+      WHERE user_id = ? AND (
+        (MONTH(leave_start) = ? AND YEAR(leave_start) = ?) OR 
+        (MONTH(leave_end) = ? AND YEAR(leave_end) = ?) OR 
+        (leave_start <= ? AND leave_end >= ?)
+      )
     `;
 
     const [leaves] = await db.query(leavesQuery, [
@@ -128,14 +128,16 @@ const getAttendanceCalendarForUser = async (req, res) => {
       `${year}-${month}-${daysInMonth}`,
     ]);
 
+    console.log(leaves);
+
     const publicHolidaysQuery = `
-    SELECT holiday_name, holiday_start_date, holiday_end_date 
-    FROM admin_public_holidays_settings 
-    WHERE (
-      (MONTH(holiday_start_date) = ? AND YEAR(holiday_start_date) = ?) OR 
-      (MONTH(holiday_end_date) = ? AND YEAR(holiday_end_date) = ?) OR 
-      (holiday_start_date <= ? AND holiday_end_date >= ?)
-    )
+      SELECT holiday_name, holiday_start_date, holiday_end_date 
+      FROM admin_public_holidays_settings 
+      WHERE (
+        (MONTH(holiday_start_date) = ? AND YEAR(holiday_start_date) = ?) OR 
+        (MONTH(holiday_end_date) = ? AND YEAR(holiday_end_date) = ?) OR 
+        (holiday_start_date <= ? AND holiday_end_date >= ?)
+      )
     `;
 
     const [public_holidays] = await db.query(publicHolidaysQuery, [
@@ -149,6 +151,12 @@ const getAttendanceCalendarForUser = async (req, res) => {
 
     console.log(public_holidays);
 
+    const convertToIST = (date) => {
+      return new Date(date).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      });
+    };
+
     const publicHolidayDates = new Set();
 
     public_holidays.forEach((holiday) => {
@@ -156,7 +164,8 @@ const getAttendanceCalendarForUser = async (req, res) => {
       const end = new Date(holiday.holiday_end_date);
 
       while (current <= end) {
-        publicHolidayDates.add(current.toISOString().split("T")[0]);
+        const currentIST = convertToIST(current).split(", ")[0];
+        publicHolidayDates.add(currentIST);
         current.setDate(current.getDate() + 1);
       }
     });
@@ -166,49 +175,56 @@ const getAttendanceCalendarForUser = async (req, res) => {
     const formattedAttendances = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month - 1, day)
-        .toISOString()
-        .split("T")[0];
+      const currentDateUTC = new Date(Date.UTC(year, month - 1, day));
+      const currentDateIST = convertToIST(currentDateUTC).split(", ")[0];
 
       let isLeave = false;
-      let isPublicHoliday = publicHolidayDates.has(currentDate);
+      let isPublicHoliday = publicHolidayDates.has(currentDateIST);
       let checkInTime = null;
       let location = null;
 
-      for (const att of attendances) {
-        const attendanceDate = att.date_time.toISOString().split("T")[0];
-        if (attendanceDate === currentDate) {
-          checkInTime = att.date_time.toISOString().split("T")[1].split(".")[0];
-          location = att.location;
-          break;
-        }
-      }
-
       if (!isPublicHoliday) {
         for (const leave of leaves) {
-          const leaveStart = leave.leave_start.toISOString().split("T")[0];
-          const leaveEnd = leave.leave_end.toISOString().split("T")[0];
+          const leaveStartUTC = new Date(leave.leave_start)
+            .toISOString()
+            .split("T")[0];
+          const leaveEndUTC = new Date(leave.leave_end)
+            .toISOString()
+            .split("T")[0];
           if (
-            currentDate >= leaveStart &&
-            currentDate <= leaveEnd &&
+            currentDateUTC.toISOString().split("T")[0] >= leaveStartUTC &&
+            currentDateUTC.toISOString().split("T")[0] <= leaveEndUTC &&
             leave.leave_status
           ) {
             isLeave = true;
-            checkInTime = null;
-            location = null;
+            break;
+          }
+        }
+      }
+
+      if (!isPublicHoliday && !isLeave) {
+        for (const att of attendances) {
+          const attendanceDateUTC = new Date(att.date_time);
+          if (
+            attendanceDateUTC.toISOString().split("T")[0] ===
+            currentDateUTC.toISOString().split("T")[0]
+          ) {
+            checkInTime = convertToIST(attendanceDateUTC).split(", ")[1];
+            location = att.location;
             break;
           }
         }
       }
 
       formattedAttendances.push({
-        date: currentDate,
-        checkInTime,
-        location,
+        date: currentDateIST,
+        checkInTime: isPublicHoliday || isLeave ? null : checkInTime,
+        location: isPublicHoliday || isLeave ? null : location,
         isLeave,
         isPublicHoliday,
       });
     }
+
     // Sort the response array chronologically based on the date
     formattedAttendances.sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -325,6 +341,43 @@ const updateLeaveRequest = async (req, res) => {
     if (updatedLeaveRequest.affectedRows === 0) {
       return sendErrorResponse(400, "Can't Update Leave Request", res);
     }
+    if (leave_status === 1) {
+      // Retrieve leave details
+      const leaveDetailsQuery = `SELECT leave_start, leave_end FROM leaves WHERE id = ?`;
+      const [leaveDetails] = await db.query(leaveDetailsQuery, [leave_id]);
+
+      if (leaveDetails.length === 0) {
+        return sendErrorResponse(400, "Leave details not found", res);
+      }
+
+      const leaveStart = new Date(leaveDetails[0].leave_start);
+      const leaveEnd = new Date(leaveDetails[0].leave_end);
+
+      // Function to convert date string to UTC date
+      const convertToUTC = (dateString) => {
+        const date = new Date(dateString);
+        return new Date(
+          Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+        );
+      };
+
+      const attendanceQuery = `INSERT INTO attendance (user_id, date_time, location) VALUES (?, ?, ?)`;
+
+      // Loop through each day in the leave range
+      for (
+        let date = leaveStart;
+        date <= leaveEnd;
+        date.setDate(date.getDate() + 1)
+      ) {
+        const currentDateUTC = convertToUTC(date).toISOString().split("T")[0];
+        await db.query(attendanceQuery, [
+          user.id,
+          currentDateUTC,
+          "Ienergy Digital Building",
+        ]);
+      }
+    }
+
     return sendResponse(200, "Updated Leave Request", res);
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
@@ -368,7 +421,44 @@ const addPublicHoliday = async (req, res) => {
     if (!holiday.affectedRows) {
       return sendResponse(404, "Holiday can't be added", res);
     }
-    return sendResponse(200, "Holiday added successfully", res);
+    // Retrieve all users
+    const usersQuery = `SELECT id FROM users`;
+    const [users] = await db.query(usersQuery);
+
+    // Function to convert date string to UTC date
+    const convertToUTC = (dateString) => {
+      const date = new Date(dateString);
+      return new Date(
+        Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+      );
+    };
+
+    const startDate = convertToUTC(holiday_start_date);
+    const endDate = convertToUTC(holiday_end_date);
+
+    const attendanceQuery = `INSERT INTO attendance (user_id, date_time, location) VALUES (?, ?, ?)`;
+
+    for (
+      let date = startDate;
+      date <= endDate;
+      date.setDate(date.getDate() + 1)
+    ) {
+      const currentDateUTC = date.toISOString().split("T")[0];
+
+      for (const user of users) {
+        await db.query(attendanceQuery, [
+          user.id,
+          currentDateUTC,
+          "Ienergy Digital Building",
+        ]);
+      }
+    }
+
+    return sendResponse(
+      200,
+      "Holiday added and attendance marked successfully",
+      res
+    );
   } catch (error) {
     return sendErrorResponse(500, error.message, res);
   }
